@@ -2,6 +2,7 @@ import os
 import re
 from pylab import *
 from scipy.optimize import leastsq
+from fitting_machinery import *
 
 PHI_sensitivity = {'Li 1s':    0.025, 'Be 1s':    0.074, 'B 1s':     0.156, 'C 1s':     0.296, 
                    'N 1s':     0.477, 'O 1s':     0.711, 'F 1s':     1.000, 'Ne 1s':    1.340, 
@@ -69,6 +70,54 @@ class Spectrum:
     self.E = self.E[lower]
     self.data = self.data[lower]
 
+  def sg(self,points):
+    ker = {}
+    ker[5] = r_[-3,12,17,12,-3]/35
+    ker[7] = r_[-2,3,6,7,6,3,-2]/21
+    ker[9] = r_[-21,14,39,54,59,54,39,14,-21]/231
+    ker[11] = r_[-36,9,44,69,84,89,84,69,44,9,-36]/429
+    ker[13] = r_[-11,0,9,16,21,24,25,24,21,16,9,0,-11]/143
+    ker[15] = r_[-78,-13,42,87,122,147,162,167,162,147,122,87,42,-13,-78]/1105
+    ker[17] = r_[-21,-6,7,18,27,34,39,42,43,42,39,34,27,18,7,-6,-21]/323
+    ker[19] = r_[-136,-51,24,89,144,189,224,249,264,269,264,249,224,189,144,89,24,-51,-136]/2261
+    ker[21] = r_[-171,-76,9,84,149,204,249,284,309,324,309,284,204,149,84,9,-76,-171]/3059
+    ker[23] = r_[-42,-21,-2,15,30,43,54,63,70,75,78,79,78,75,70,63,54,43,30,15,-2,-21,-42]/8059
+    ker[25] = r_[-253,-138,-33,62,147,222,287,322,387,422,447,462,467,462,447,422,387,322,287,222,147,62,-33,-138,-253]/5175
+
+    sg = -ker[points]
+    pad_start = array([])
+    pad_end = array([])
+    for i in range(0,points/2):
+      pad_start = r_[self.data[0], pad_start]
+      pad_end = r_[pad_end, self.data[-1]]
+    sg1 = r_[pad_start, self.data, pad_end]
+    sg1 = convolve(sg1, sg, 'valid')
+    return sg1
+
+  def sg1(self,points):
+    ker = {}
+    ker[5] = r_[-2:2.1]/10
+    ker[7] = r_[-3:3.1]/28
+    ker[9] = r_[-4:4.1]/60
+    ker[11] = r_[-5:5.1]/110
+    ker[13] = r_[-6:6.1]/182
+    ker[15] = r_[-7:7.1]/280
+    ker[17] = r_[-8:8.1]/408
+    ker[19] = r_[-9:9.1]/570
+    ker[21] = r_[-10:10.1]/770
+    ker[23] = r_[-11:11.1]/1012
+    ker[25] = r_[-12:12.1]/1300
+
+    sg = ker[points]/(self.E[0]-self.E[1])
+    pad_start = array([])
+    pad_end = array([])
+    for i in range(0,points/2):
+      pad_start = r_[self.data[0], pad_start]
+      pad_end = r_[pad_end, self.data[-1]]
+    sg1 = r_[pad_start, self.data, pad_end]
+    sg1 = convolve(sg1, sg, 'valid')
+    return sg1
+
   def nobg(self):
     """return spectrum with bg subtracted"""
     return self.data - self.bg(self.E, self.data)
@@ -104,150 +153,62 @@ class Spectrum:
     return sigma
 
   def simple_guess_s_peak(self):
-    self.simple_guess_peak()
+    return
 
   def simple_guess_p_peak(self):
-    self.simple_guess_split_peak(r_[0.49,0.51], r_[0.1,15])
-    
+    return
+
   def simple_guess_d_peak(self):
-    self.simple_guess_split_peak(r_[0.66,0.68], r_[0.1,15])
+    return
 
   def simple_guess_f_peak(self):
-    self.simple_guess_split_peak(r_[0.74,0.76], r_[0.1,15])
+    return
 
   def simple_guess_peak(self):
-    a_guess = max(self.residuals())
-    mu_guess = self.residual_m1()
-    sigma_guess = self.residual_m2()
-    m_guess = 0.5
-    guess_parm = r_[a_guess,
-                    mu_guess,
-                    sigma_guess,
-                    m_guess]
-    print guess_parm
-    a_penalty = Penalty(r_[0,20*a_guess],exp_bounded_penalty)
-    mu_penalty = Penalty(r_[self.E[0],self.E[-1]],exp_bounded_penalty)
-    sigma_penalty = Penalty(r_[0,2*sigma_guess],exp_bounded_penalty)
-    m_penalty = Penalty(r_[0,1],exp_bounded_penalty)
-    penalties = [a_penalty,
-                 mu_penalty,
-                 sigma_penalty,
-                 m_penalty]
+    return
 
-    self.add_peak(str(mu_guess), guess_parm, penalties, gl)
+  def guess_bg_from_spec(self, bg_spec):
+    initial_values = copy(bg_spec['initial_values'])
+    ranges = copy(bg_spec['ranges'])
+    self.guess_bg(bg_spec['name'], initial_values, ranges, eval(bg_spec['function']), eval(bg_spec['penalty_function']))
 
-  def simple_guess_split_peak(self, ratio_window, split_window):
-    a_guess = max(self.residuals())
-    mu_guess = self.residual_m1()
-    sigma_guess = self.residual_m2()
-    m_guess = 0.5
-    ratio_a_guess = average(ratio_window)
-    ratio_area_guess = average(ratio_window)
-    split_guess = average(split_window)
-    guess_parm = r_[a_guess,
-                    mu_guess,
-                    sigma_guess,
-                    m_guess,
-                    ratio_a_guess,
-                    ratio_area_guess,
-                    split_guess]
-
-    print guess_parm
-    a_penalty = Penalty(r_[0,20*a_guess],exp_bounded_penalty)
-    mu_penalty = Penalty(r_[self.E[0],self.E[-1]],exp_bounded_penalty)
-    sigma_penalty = Penalty(r_[0,2*sigma_guess],exp_bounded_penalty)
-    m_penalty = Penalty(r_[0,1],exp_bounded_penalty)
-    ratio_a_penalty = Penalty(r_[0,1],exp_bounded_penalty)
-    ratio_area_penalty = Penalty(ratio_window,exp_bounded_penalty)
-    split_penalty = Penalty(split_window,exp_bounded_penalty)
-    penalties = [a_penalty,
-                 mu_penalty,
-                 sigma_penalty,
-                 m_penalty,
-                 ratio_a_penalty,
-                 ratio_area_penalty,
-                 split_penalty]
-
-    self.add_peak(str(mu_guess), guess_parm, penalties, spin_split_gl)
-
-  def guess_peak_(self, name, ranges, function):
-    guess_parm = array([])
+  def guess_bg(self, name, initial_values, ranges, function, penalty_function):
     penalties = []
     for range in ranges:
-      guess_parm = r_[guess_parm, average(range)]
-      penalties.append(Penalty(range,exp_bounded_penalty))
+      penalties.append(Penalty(range,penalty_function))
 
-    self.add_peak(name, guess_parm, penalties, function)
+    self.bg = Background(name, initial_values, penalties, function, initial_values[1]/2)
+    self.bg.optimize_fit(self.E, self.data)
   
-  def guess_peak(self, name, a_window, mu_window, sigma_window, m_window):
-    a_guess = max(self.residuals())
-    mu_guess = average(mu_window) 
-    sigma_guess = average(sigma_window) 
-    m_guess = average(m_window)
-    guess_parm = r_[a_guess,
-                    mu_guess,
-                    sigma_guess,
-                    m_guess]
-                                   
-    a_penalty = Penalty(a_window,exp_bounded_penalty)
-    mu_penalty = Penalty(mu_window,exp_bounded_penalty)
-    sigma_penalty = Penalty(sigma_window,exp_bounded_penalty)
-    m_penalty = Penalty(m_window,exp_bounded_penalty)
-    penalties = [a_penalty,
-                 mu_penalty,
-                 sigma_penalty,
-                 m_penalty]
-    
-    self.add_peak(name, guess_parm, penalties, gl)
+  def guess_peak_from_spec(self, peak_spec):
+    initial_values = copy(peak_spec['initial_values'])
+    initial_values[0] = max(self.nobg())*initial_values[0]
 
-  def guess_split_peak(self, name, a_window, mu_window, sigma_window, m_window, ratio_a_window, ratio_area_window, split_window):
-    a_guess = max(self.residuals())
-    mu_guess = average(mu_window) 
-    sigma_guess = average(sigma_window)
-    m_guess = average(m_window)
-    ratio_a_guess = average(ratio_a_window)
-    ratio_area_guess = average(ratio_area_window)
-    split_guess = average(split_window)
-    guess_parm = r_[a_guess,
-                    mu_guess,
-                    sigma_guess,
-                    m_guess,
-                    ratio_a_guess,
-                    ratio_area_guess,
-                    split_guess]
-                                   
-    a_penalty = Penalty(a_window,exp_bounded_penalty)
-    mu_penalty = Penalty(mu_window,exp_bounded_penalty)
-    sigma_penalty = Penalty(sigma_window,exp_bounded_penalty)
-    m_penalty = Penalty(m_window,exp_bounded_penalty)
-    ratio_a_penalty = Penalty(ratio_a_window,exp_bounded_penalty)
-    ratio_area_penalty = Penalty(ratio_area_window,exp_bounded_penalty)
-    split_penalty = Penalty(split_window,exp_bounded_penalty)
-    penalties = [a_penalty,
-                 mu_penalty,
-                 sigma_penalty,
-                 m_penalty,
-                 ratio_a_penalty,
-                 ratio_area_penalty,
-                 split_penalty]
+    ranges = copy(peak_spec['ranges'])
+    ranges[0][0] = max(self.nobg())*ranges[0][0]
+    ranges[0][1] = max(self.nobg())*ranges[0][1]
     
-    self.add_peak(name, guess_parm, penalties, spin_split_gl)
+    self.guess_peak(peak_spec['name'], initial_values, ranges, eval(peak_spec['function']), eval(peak_spec['penalty_function']))
 
+  def guess_peak(self, name, initial_values, ranges, function, penalty_function):
+    penalties = []
+    for range in ranges:
+      penalties.append(Penalty(range,penalty_function))
+
+    self.add_peak(name, initial_values, penalties, function)
+  
   def plot(self,scale=1.0):
     """Plot the spectra"""
     plot(self.E, self.data/scale, 'k.')
-    #xlim([max(self.E), min(self.E)])
 
   def plot_peaks(self,scale=1.0):
     """Plot the peaks summed together"""
     plot(self.E, self.peaks(self.E)/scale)
-    xlim([max(self.E), min(self.E)])
 
   def plot_individual_peaks(self,scale=1.0):
     """Plot the peaks as individual functions"""
     for peak in self.peaks.peak_list:
       plot(self.E, peak(self.E)/scale)
-    xlim([max(self.E), min(self.E)])
 
   def plot_individual_peaks_bg(self,scale=1.0):
     """Plot the peaks as individual functions"""
@@ -255,27 +216,21 @@ class Spectrum:
     for peak in self.peaks.peak_list:
       plot(self.E, (peak(self.E)+b)/scale)
 
-    xlim([max(self.E), min(self.E)])
-
   def plot_residuals(self,scale=1.0):
     """plot the residuals"""
     plot(self.E, self.residuals()/scale)
-    xlim([max(self.E), min(self.E)])
 
   def plot_nobg(self,scale=1.0):
     """Plot sepctrum with bg subtracted"""
     plot(self.E,self.nobg()/scale,'k.')
-    xlim([max(self.E), min(self.E)])
 
   def plot_bg(self,scale=1.0):
     """Plot the bg"""
     plot(self.E,self.bg(self.E, self.data)/scale)
-    xlim([max(self.E), min(self.E)])
 
   def plot_full_fit(self,scale=1.0):
     """Plot the current fit including peaks and bg"""
     plot(self.E,(self.peaks(self.E)+self.bg(self.E,self.data))/scale, 'k:')
-    xlim([max(self.E), min(self.E)])
 
   def plot_full_summary(self,scale=1.0):
     """Plot the spectrum, the bg, and the full fit"""
@@ -347,7 +302,7 @@ def crop_spectra(spectra,range):
 def tougaard_3_bg_subtract_spectrum(spectrum, B_range, C_range, D_range):
   """helper function to add a tougaard bg to a bunch of spectra"""
   params = [average(B_range), average(C_range), average(D_range)]
-  penalties = [Penalty(B_range, exp_bounded_penalty), Penalty(C_range, exp_bounded_penalty), Penalty(D_range, exp_bounded_penalty)]
+  penalties = [Penalty(B_range, exp_penalty), Penalty(C_range, exp_penalty), Penalty(D_range, exp_penalty)]
   spectrum.bg = Background("tougaard3", ['B','C','D'], params, penalties, K3, C_range[1]/2)
   spectrum.bg.optimize_fit(spectrum.E, spectrum.data)
 
@@ -356,14 +311,14 @@ def tougaard_3_bg_subtract_spectra(spectra, B_range, C_range, D_range):
   for key in sorted(spectra.keys()):
     spectrum = spectra[key]
     params = [average(B_range), average(C_range), average(D_range)]
-    penalties = [Penalty(B_range, exp_bounded_penalty), Penalty(C_range, exp_bounded_penalty), Penalty(D_range, exp_bounded_penalty)]
+    penalties = [Penalty(B_range, exp_penalty), Penalty(C_range, exp_penalty), Penalty(D_range, exp_penalty)]
     spectrum.bg = Background("tougaard3", ['B','C','D'], params, penalties, K3, C_range[1]/2)
     spectrum.bg.optimize_fit(spectrum.E, spectrum.data)
 
 def tougaard_bg_subtract_spectrum(spectrum, B_range, C_range):
   """helper function to add a tougaard bg to a bunch of spectra"""
   params = [average(B_range), average(C_range)]
-  penalties = [Penalty(B_range, exp_bounded_penalty), Penalty(C_range, exp_bounded_penalty)]
+  penalties = [Penalty(B_range, exp_penalty), Penalty(C_range, exp_penalty)]
   spectrum.bg = Background("tougaard", ['B','C'], params, penalties, K, C_range[1]/2)
   spectrum.bg.optimize_fit(spectrum.E, spectrum.data)
 
@@ -372,7 +327,7 @@ def tougaard_bg_subtract_spectra(spectra, B_range, C_range):
   for key in sorted(spectra.keys()):
     spectrum = spectra[key]
     params = [average(B_range), average(C_range)]
-    penalties = [Penalty(B_range, exp_bounded_penalty), Penalty(C_range, exp_bounded_penalty)]
+    penalties = [Penalty(B_range, exp_penalty), Penalty(C_range, exp_penalty)]
     spectrum.bg = Background("tougaard", ['B','C'], params, penalties, K, C_range[1]/2)
     spectrum.bg.optimize_fit(spectrum.E, spectrum.data)
 
@@ -400,6 +355,26 @@ def plot_spectra_summary(spectra):
   grid('on')
   yticks(arange(0,size(keys)*1.2,1.2),keys)
   xlim([max(spectrum.E), min(spectrum.E)])
+
+def load_BL62_text_files(file_name_filter):
+  """helper function to load a bunch of spectra from SSRL BL6-2 text files in the current dir"""
+  files = os.listdir('.')
+
+  spectra = {}
+  
+  for file in files:
+    m = re.search('('+file_name_filter+'.*)\.dat',file)
+    if (m):
+      filename = file
+      name = filename
+      spectra[name] = Spectrum()
+      spectra[name].name = name
+      data = np.genfromtxt(filename,skip_header=12)
+      #print data
+      spectra[name].E = data[:,0]
+      spectra[name].data = data[:,1:]
+    
+  return spectra
 
 def load_SUPER_text_files(file_name_filter):
   """helper function to load a bunch of spectra from AugerScan text files in the current dir"""
@@ -448,7 +423,7 @@ def load_BL7_XAS_files(file_name_filter):
   spectra = {}
   
   for file in files:
-    m = re.search('('+file_name_filter+'.*)\.xas',file)
+    m = re.search('('+file_name_filter+'.*)\.xas$',file)
     if (m):
       filename = file
       name = filename
@@ -506,230 +481,3 @@ def load_AugerScan_text_files(file_name_filter):
           spectra[label].data = append(spectra[label].data, double(m.group(2)))
 
   return spectra
- 
-###########################################
-# Functions to feed into fitting routines 
-###########################################
-
-def K(p, E):
-  """convolution kernel for Tougaard background"""
-  B, C = p
-  K_ = B * E / (C + E**2)**2
-  K_ = K_*(K_>0)
-  return K_
-  
-def K3(p, E):
-  """convolution kernel for Tougaard background"""
-  B, C, D = p
-  K_ = B * E / ((C + E**2)**2 + D*E**2)
-  K_ = K_*(K_>0)
-  return K_
-  
-def voigt(p, E):
-  """
-    the voigt function = convolve(gaussian, lorentzian)
-    p = A, mu, sigma
-  """
-  dE = E[1]-E[0]
-  return dE * convolve( lorentzian(p,E), gaussian(p,E), 'same' )
-
-def spin_split_gl(params, E):
-  """
-    spin split for the gl function
-    a, mu, sigma are for peak1
-    ratio_a * a == a for peak2
-    ratio_sigma * sigma = sigma for peak2
-    ratio_area == ratio_a * ratio_sigma can be fixed using a boundary penalty
-      ratio_area -> 1/2 for p orbitals
-      ratio_area -> 2/3 for d orbitals
-      ratio_area -> 3/4 for f orbitals
-    split is the spacing between peak1 and peak2
-  """
-  a, mu, sigma, m, ratio_a, ratio_area, split = params
-  ratio_sigma = ratio_area / ratio_a
-  return gl_(a, mu, sigma, m, E) + gl_(ratio_a * a, mu + split, ratio_sigma * sigma, m, E)
-
-def gl_(a, mu, sigma, m, E):
-  return a * exp(-2.772589 * (1 - m) * (E - mu)**2/sigma**2) / (1 + 4 * m * (E - mu)**2/sigma**2)
-
-def gl(params, E):
-  a, mu, sigma, m = params
-  return gl_(a, mu, sigma, m, E)
-
-def gl50(params, E):
-  a, mu, sigma = params
-  m = 0.5
-  return gl_(a, mu, sigma, m, E)
-
-def gls_(a, mu, sigma, m, E):
-  return a * (1 - m) * exp(-2.772589 * (E - mu)**2/sigma**2) + m/(1 + 4 * (E - mu)**2/sigma**2) 
-
-def gls(params, E):
-  a, mu, sigma, m = params
-  return gls_(a, mu, sigma, m, E)
-
-def lorentzian_(a, mu, sigma, E):
-  return a * 1/(1 + ((E - mu)/sigma)**2)
-
-def lorentzian(params, E):
-  a, mu, sigma = params
-  return lorentzian(a, mu, sigma, E)
-
-def gaussian_(a, mu, sigma, E):
-  return a * exp(-((E-mu)/sigma)**2)
-
-def gaussian(params, E):
-  a, mu, sigma = params
-  return gaussian_(a, mu, sigma, E)
-
-###########################################
-# Penalty functions
-###########################################
-
-def no_penalty(range, p):
-  return 1.0
-
-def exp_bounded_penalty(range, p):
-  A = 60./(range[-1] - range[0])
-  return 1+exp(A*-(p-range[0]))+exp(A*(p-range[-1]))
-
-###########################################
-# Fitting machinery                        
-#   Penalty: a class to steer fitting
-#   Background: generic convolution based background
-#   Peak: a single fitting peak
-#   Peaks: a collection of peaks
-###########################################
-
-class Penalty:
-  """Encapsulates a penalty function to steer fitting for a parameter"""
-
-  def __init__(self, params, f):
-    """Initialize penalty function"""
-    self.params = params
-    self.f = f
-
-  def __call__(self, p):
-    """Penalty!"""
-    return self.f(self.params, p)
-
-class Background:
-  """Implements a generic background based on a convolution kernel function"""
-
-  def __init__(self, name, param_names, params, penalties, kernel, kernel_end):
-    self.name = name
-    self.param_names = param_names
-    self.params = params
-    self.penalties = penalties
-    self.kernel = kernel
-    self.kernel_end = kernel_end
-
-  def f(self, params, E, spectrum):
-    dE = E[1] - E[0]
-    spectrum = spectrum - min(spectrum)
-    bg = dE * convolve( spectrum, self.kernel( params, E)[::-1], 'full')
-    return bg[bg.size-spectrum.size:]
-  
-  def residuals(self, params, E, spectrum):
-    res = spectrum - self.f(params, E, spectrum)
-    i = 0
-    for p in params:
-      res *= self.penalties[i](p)
-      i += 1
-
-    res[res<0] = res[res<0]*6
-    return res
-  
-  def EE(self, dE):
-    return arange(0, self.kernel_end, abs(dE))
-
-  def optimize_fit(self, E, spectrum):
-    offset = min(spectrum)
-    spectrum = spectrum - offset
-    self.dE = E[1]-E[0]
-    plsq = leastsq(self.residuals, self.params, args=(self.EE(self.dE), spectrum))
-    self.params = plsq[0]
-    return self.f(self.params, self.EE(self.dE), spectrum) + offset
- 
-  def __call__(self, E, spectrum):
-    offset = min(spectrum)
-    spectrum = spectrum - offset
-    self.dE = E[1]-E[0]
-    return self.f(self.params, self.EE(self.dE), spectrum) + offset
-
-class Peak:
-
-  def __init__(self, name, params, penalties, f):
-    self.name = name
-    self.params = params
-    self.penalties = penalties
-    self.f = f
-
-  def residuals(self, params, E, spectrum):
-    res = spectrum - self.f(params, E)
-    i = 0
-    for p in params:
-      res *= self.penalties[i](p)
-      i += 1
-
-    return res
-
-  def __call__(self, E):
-    return self.f(self.params, E)
-
-
-class Peaks:
-
-  def __init__(self):
-    """something will go here"""
-    self.peak_list = []
-
-  def __getitem__(self, i):
-    return self.peak_list[i]
-
-  def residuals(self, params, E, spectrum):
-    res = zeros(E.size)
-    sum_up = zeros(E.size)
-    param_eater = params
-    for peak in self.peak_list:
-      p = param_eater[:peak.params.size]
-      param_eater = param_eater[peak.params.size:]
-      sum_up += peak.f(p,E)
-
-    res = spectrum-sum_up
-
-    param_eater = params
-    for peak in self.peak_list:
-      i = 0
-      p = param_eater[:peak.params.size]
-      param_eater = param_eater[peak.params.size:]
-      for param in p:
-        res *= peak.penalties[i](param)
-        i += 1
-
-    return abs(res)
-
-  def optimize_fit(self, E, spectrum):
-    params = []
-    for peak in self.peak_list:
-      params = append(params, peak.params)
-
-    plsq = leastsq(self.residuals, params, args=(E, spectrum))
-
-    params = plsq[0]
-
-    for peak in self.peak_list:
-      peak.params = params[:peak.params.size]
-      params = params[peak.params.size:]
-
-    return self(E)
-
-  def add_peak(self, peak):
-    self.peak_list.append(peak)
-
-  def __call__(self, E):
-    sum_up = zeros(E.size)
-    for peak in self.peak_list:
-      sum_up += peak(E)
-    return sum_up
-
