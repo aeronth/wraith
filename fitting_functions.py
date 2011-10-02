@@ -4,6 +4,12 @@ from pylab import *
 # Functions to feed into fitting routines 
 ###########################################
 
+def analyzer_function(p, E):
+    A, B = p
+    BG = A/sqrt(abs(B-E))
+    #print "A: %f, B: %f"%(A,B)
+    return BG
+
 def K(p, E):
     """convolution kernel for Tougaard background"""
     B, C = p
@@ -40,7 +46,8 @@ def spin_split_gl(params, E):
         """
     a, mu, sigma, m, ratio_a, ratio_area, split = params
     ratio_sigma = ratio_area / ratio_a
-    return gl_(a, mu, sigma, m, E) + gl_(ratio_a * a, mu + split, ratio_sigma * sigma, m, E)
+    return gl_(a, mu, sigma, m, E) + gl_(ratio_a * a, mu - split, ratio_sigma * sigma, m, E)
+spin_split_gl.latex = r'$ssgl(E) = gl(A,\mu,\sigma,m,E) + gl(R_A A, \mu + \Delta_E, \frac{R_{Area}}{R_A} \sigma, E)$'
 
 def gl_(a, mu, sigma, m, E):
     return a * exp(-2.772589 * (1 - m) * (E - mu)**2/sigma**2) / (1 + 4 * m * (E - mu)**2/sigma**2)
@@ -48,6 +55,7 @@ def gl_(a, mu, sigma, m, E):
 def gl(params, E):
     a, mu, sigma, m = params
     return gl_(a, mu, sigma, m, E)
+gl.latex = r'$gl(A,\mu,\sigma,m,E) = A e^{\frac{(-4ln(2) (1-m) (E - \mu)^2/\sigma^2)}{(1+4m(E-\mu)^2/\sigma^2)}}$'
 
 def gl50(params, E):
     a, mu, sigma = params

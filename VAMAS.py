@@ -706,9 +706,9 @@ class VAMASBlock:
         num_values = self.number_of_ordinate_values/self.number_of_corresponding_variables
         if (self.technique.upper() != 'AES DIR'):
             if (self.abscissa_label.upper() == 'BINDING ENERGY'):
-                return arange(num_values) * self.abscissa_increment + self.abscissa_start
+                return -(arange(num_values) * self.abscissa_increment + self.abscissa_start)
             else:
-                return self.analysis_source_characteristic_energy - (arange(num_values) * self.abscissa_increment + self.abscissa_start)
+                return -(self.analysis_source_characteristic_energy - (arange(num_values) * self.abscissa_increment + self.abscissa_start))
         else:
             return arange(num_values) * self.abscissa_increment + self.abscissa_start
 
