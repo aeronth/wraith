@@ -1,12 +1,16 @@
 #! /usr/bin/python
 
-import sys, os, csv
-from PyQt4.QtCore import *
+import sys, os, csv, string
+#from PySide.QtCore import *
 from PyQt4.QtCore import pyqtSignal as Signal
 from PyQt4.QtCore import pyqtSlot as Slot
+from PyQt4.QtCore import *
 from PyQt4.QtGui import *
+from PyQt4 import QtCore, QtGui
 
 import matplotlib
+matplotlib.use('Qt4Agg')
+
 from pylab import *
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
@@ -14,6 +18,8 @@ from matplotlib.figure import Figure
 from spectra_fitting import *
 from VAMAS import *
 from pprint import *
+from mpl_toolkits.axisartist import Subplot
+
 
 class ParameterSlider(QAbstractSlider):
 
@@ -71,8 +77,6 @@ class ParameterSlider(QAbstractSlider):
   
     self.ignore_signals = True
     try:
-      #print 'valueChanged (%0.2f, %0.2f)'%(self.minValue,self.maxValue)
-      #print str(self.minValue + value * (self.maxValue-self.minValue)/1000)
       self.value.setText(str(self.minValue + value * (self.maxValue-self.minValue)/1000) )
     except:
       pass
@@ -86,8 +90,6 @@ class ParameterSlider(QAbstractSlider):
     try:
       self.minValue = float(self.lower.text())
       self.maxValue = float(self.upper.text())
-      #print 'updateSlider (%0.2f, %0.2f)'%(self.minValue,self.maxValue)
-      #print int( (float(self.value.text())-self.minValue) * 1000/(self.maxValue-self.minValue))
       self.slider.setValue( int( (float(self.value.text())-self.minValue) * 1000/(self.maxValue-self.minValue)))
     except:
       pass
@@ -157,6 +159,39 @@ class ParameterDialog(QDialog):
       self.fit_object.set_spec(spec)
       self.parent.on_show()
 
+class AverageWindow(QMainWindow):
+    def __init__(self, spectrum, parent=None):
+      super(AverageWindow,self).__init__(parent)
+
+      self.parent = parent
+    
+      self.spectrum = spectrum
+
+      self.main_frame = QWidget()
+
+      mainLayout = QVBoxLayout()
+      self.setWindowTitle('Average')
+
+      self.dpi = 100
+      self.fig = Figure((6.0, 4.0), dpi=self.dpi, facecolor='w', edgecolor='k')
+      self.canvas = FigureCanvas(self.fig)
+      self.canvas.setParent(self.main_frame)
+
+      self.axes = Subplot(self.fig,1,1,1)
+      self.fig.add_subplot(self.axes)
+      self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
+      
+      mainLayout.addWidget(self.canvas)
+      mainLayout.addWidget(self.mpl_toolbar)
+
+      self.main_frame.setLayout(mainLayout)
+
+      self.setCentralWidget(self.main_frame)
+
+      spectrum.plot_full_summary(scale=1,axes=self.axes)
+
+    def update(self):
+      pass
 
 class Form(QMainWindow):
     def __init__(self, parent=None):
@@ -182,14 +217,12 @@ class Form(QMainWindow):
     def load_file(self, filename=None):
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFiles)
-        dialog.setNameFilter('VAMAS (*.vms);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
-        self.filefilter = 'VAMAS (*.vms)'
+        dialog.setNameFilter('BL7.0.1.1 XAS (*.txt);; VAMAS (*.vms);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
+        self.filefilter = 'BL7.0.1.1 XAS (*.txt)'
         dialog.filterSelected.connect(self.filterSelected)
 
         if dialog.exec_():
           filenames = dialog.selectedFiles()
-
-        print(self.filefilter)
 
         for filename in filenames:
           if filename:
@@ -243,7 +276,30 @@ class Form(QMainWindow):
         
         has_series = False
         
+        offset = 0
+        stacking_param = 1.25
+        ticks = array([])
+        labels = []
+
         for file in range(self.series_list_root.rowCount()):
+          max_val = 0
+          has_series = False; 
+          for row in range(self.series_list_root.child(file).rowCount()):
+            model_index = self.series_list_root.child(file).child(row).index()
+            checked = self.series_list_model.data(model_index,
+                Qt.CheckStateRole) == QVariant(Qt.Checked)
+            name = str(self.series_list_model.data(model_index).toString())
+            if checked:
+                has_series = True
+                filename = self.series_list_root.child(file).text()
+                spectrum = self.files[filename].get_spectrum(row)
+                if self.BG_cb.isChecked():
+                  m = max(spectrum.data)
+                else:
+                  m = max(spectrum.nobg())
+                if m>max_val:
+                  max_val=m
+           
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
             checked = self.series_list_model.data(model_index,
@@ -251,21 +307,46 @@ class Form(QMainWindow):
             name = str(self.series_list_model.data(model_index).toString())
             
             if checked:
-                has_series = True
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
                 scale = 1.0
+
                 if self.NE_cb.isChecked():
                   if self.BG_cb.isChecked():
                     if self.normalize_cb.isChecked():
-                      scale = max(spectrum.data)
-                    spectrum.plot_full_summary(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked())
+                      scale = max_val
+                    spectrum.plot_full_summary(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
                   else:
                     if self.normalize_cb.isChecked():
-                      scale = max(spectrum.nobg())
-                    spectrum.plot_full_summary_nobg(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked())
+                      scale = max_val
+                    spectrum.plot_full_summary_nobg(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
                 if self.dNE_cb.isChecked():
-                  spectrum.plot_sg1(scale=scale,points=5,axes=self.axes)
+                  spectrum.plot_sg1(scale=scale,points=5,axes=self.axes,offset=offset)
+
+          if self.stacked_cb.isChecked():
+            if self.normalize_cb.isChecked():
+              if has_series:
+                ticks = r_[ticks, offset + r_[0.0:1.01:0.25]]
+                self.axes.axis[offset] = self.axes.new_floating_axis(0,offset)
+                self.axes.axis[offset].toggle(ticklabels=False)
+                new_labels = r_[0.0:1.01:0.25]
+                labels += map(str,new_labels)
+                offset += stacking_param
+            else:
+              if has_series:
+                ticks = r_[ticks, offset]
+                labels += ['$0$']
+                self.axes.axis[offset] = self.axes.new_floating_axis(0,offset)
+                self.axes.axis[offset].toggle(ticklabels=False)
+                inc = (10**floor(log10(max_val)))
+                inc = floor(max_val/inc) * inc /2
+                for val in r_[inc:max_val*1.01:inc]:
+                  ticks = r_[ticks, offset + val]
+                  labels += [r'$%.2f \times 10^{%.0f}$'%(val/10**(floor(log10(val))), floor(log10(val)))]
+                offset += max_val*stacking_param
+        if self.stacked_cb.isChecked():
+          self.axes.set_yticks(ticks)
+          self.axes.set_yticklabels(labels)
         
         self.canvas.draw()
 
@@ -376,6 +457,38 @@ class Form(QMainWindow):
     def plot_summary_csv(self):
       pass
 
+    def average(self):
+      i = 0
+      outputname = ''
+      for file in range(self.series_list_root.rowCount()):
+        for row in range(self.series_list_root.child(file).rowCount()):
+          model_index = self.series_list_root.child(file).child(row).index()
+          checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+          if checked:
+            filename = self.series_list_root.child(file).text()
+            spectrum = self.files[filename].get_spectrum(row)
+            outputname += str(filename+spectrum.name)
+            if i==0:
+              summer = copy(spectrum.data)
+              E = spectrum.E()
+            else:
+              summer += spectrum.data
+
+            i += 1
+
+      ave = summer/i
+      spectrum = Spectrum()
+
+      spectrum.EE = E
+      spectrum.data = ave
+      spectrum.name = 'Average'
+
+      self.averageWindow = AverageWindow(spectrum, parent=self)
+      self.averageWindow.show()
+      out = c_[spectrum.EE,spectrum.data]
+      np.savetxt(string.replace(outputname,'/','')+'.csv', out, fmt="%12.6G")
+      #figure()
+ 
 
     def on_about(self):
         msg = __doc__
@@ -386,7 +499,6 @@ class Form(QMainWindow):
         self.parameterDialog.show()
 
     def on_pick(self, event):
-        print repr(event.artist)
         if isinstance(event.artist, matplotlib.text.Annotation):
           self.modify_fit(event.artist)
           return True
@@ -483,6 +595,31 @@ class Form(QMainWindow):
                         'ranges':           [ r_[1, 4000], r_[1, 2000], r_[1, 2000] ]  
                         }
             event.artist.spectrum.guess_bg_from_spec(bg_spec)
+        elif self.sloped_arctanRadio.isChecked():
+            bg_spec = { 'name': 'arctan',
+                        'function': 'fitting_arctan',
+                        'penalty_function': 'quad_penalty',
+                        'variables':  ['A', 'B', 'u'],
+                        'values': r_[ y, 1/100.0, x, 0],
+                        'ranges': [ r_[ -A_scale*y, A_scale*y],
+                                    r_[0, 1000],
+                                    x+r_[-100,100],
+                                    r_[-1e9, 1e9] ]
+                      }
+            event.artist.spectrum.guess_abg_from_spec(bg_spec)
+        elif False:#self.sloped_sarctanRadio.isChecked():
+            bg_spec = { 'name': 'sloped arctan',
+                        'function': 'sloped_arctan',
+                        'penalty_function': 'quad_penalty',
+                        'variables':  ['A', 'B', 'u', 'm', 'b'],
+                        'values': r_[ y, 1/100.0, x, 0, 0],
+                        'ranges': [ r_[ -A_scale*y, A_scale*y],
+                                    r_[0, 1000],
+                                    x+r_[-100,100],
+                                    r_[-1e9,1e9],
+                                    r_[-1e9,1e9] ]
+                      }
+            event.artist.spectrum.guess_abg_from_spec(bg_spec)
             
         self.on_show()
 
@@ -496,17 +633,18 @@ class Form(QMainWindow):
         self.dpi = 100
         self.fig = Figure((6.0, 4.0), dpi=self.dpi, facecolor='w', edgecolor='k')
         self.canvas = FigureCanvas(self.fig)
-        self.canvas.setParent(self.main_frame)
+        #self.canvas.setParent(self.main_frame)
         self.cidpress = self.fig.canvas.mpl_connect('pick_event', self.on_pick)
 
-        self.axes = self.fig.add_subplot(111)
+        self.axes = Subplot(self.fig,1,1,1)
+        self.fig.add_subplot(self.axes)
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
         
         log_label = QLabel("Spectra:")
         self.series_list_view = QTreeView()
         self.series_list_view.setModel(self.series_list_model)
         self.series_list_view.setDragDropMode(QAbstractItemView.InternalMove)
-        
+
         #Checkboxes to control plotting display
         self.param_cb = QCheckBox("Show Parameters")
         self.param_cb.setChecked(False)
@@ -532,6 +670,10 @@ class Form(QMainWindow):
         self.BG_cb.setChecked(True)
         self.BG_cb.stateChanged.connect(self.on_show)
 
+        self.stacked_cb = QCheckBox("&Stacked")
+        self.stacked_cb.setChecked(True)
+        self.stacked_cb.stateChanged.connect(self.on_show)
+
         #plotting display controls layout
         cb_hbox1 = QHBoxLayout()
         cb_hbox2 = QHBoxLayout()
@@ -543,6 +685,7 @@ class Form(QMainWindow):
         cb_hbox2.addWidget(self.dNE_cb)
         cb_hbox3.addWidget(self.normalize_cb)
         cb_hbox3.addWidget(self.BG_cb)
+        cb_hbox3.addWidget(self.stacked_cb)
         cb_vbox.addLayout(cb_hbox1)
         cb_vbox.addLayout(cb_hbox2)
         cb_vbox.addLayout(cb_hbox3)
@@ -555,6 +698,7 @@ class Form(QMainWindow):
         self.fPeakRadio = QRadioButton("&f")
         self.tougaardRadio = QRadioButton("&Tougaard")
         self.tougaard3Radio = QRadioButton("&Tougaard3")
+        self.sloped_arctanRadio = QRadioButton("&arctan")
         self.tougaardRadio.setChecked(True)
 
         #layout fitting types
@@ -567,6 +711,7 @@ class Form(QMainWindow):
         peak_vbox.addWidget(self.fPeakRadio)
         bg_vbox.addWidget(self.tougaardRadio)
         bg_vbox.addWidget(self.tougaard3Radio)
+        bg_vbox.addWidget(self.sloped_arctanRadio)
         bg_vbox.addStretch(1)
         fit_hbox.addLayout(peak_vbox)
         fit_hbox.addLayout(bg_vbox)
@@ -605,6 +750,10 @@ class Form(QMainWindow):
         self.button_plot_summary.clicked.connect(self.plot_summary_csv)
         self.button_plot_summary.setShortcut("Ctrl+E")
 
+        self.button_average = QPushButton("&Average")
+        self.button_average.clicked.connect(self.average)
+        self.button_average.setShortcut("Ctrl+A")
+
 
         #action buttons layout
         mods_box = QGridLayout()
@@ -616,6 +765,7 @@ class Form(QMainWindow):
         mods_box.addWidget(self.button_load_fits,1,2)
         mods_box.addWidget(self.button_plot_summary,3,0)
         mods_box.addWidget(self.button_write_summary,3,1)
+        mods_box.addWidget(self.button_average,3,2)
 
         left_vbox = QVBoxLayout()
         left_vbox.addWidget(self.canvas)
@@ -721,6 +871,13 @@ class DataHolder(object):
             spectrum.name = 'I1'
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
+            
+            spectrum = Spectrum()
+            spectrum.EE = experiment[:,1]
+            spectrum.data = experiment[:,2]/experiment[:,1]
+            spectrum.name = 'I1/I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
 
             spectrum = Spectrum()
             spectrum.EE = experiment[:,1]
@@ -736,15 +893,75 @@ class DataHolder(object):
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
             
-            try:
-              spectrum = Spectrum()
-              spectrum.EE = experiment[:,1]
-              spectrum.data = experiment[:,6]/experiment[:,1]
-              spectrum.name = 'ICR/I0'
-              self.spectra.append(spectrum)
-              self.names.append(spectrum.name)
-            except:
-              pass
+            spectrum = Spectrum()
+            spectrum.EE = experiment[:,1]
+            spectrum.data = experiment[:,6]/experiment[:,1]
+            spectrum.name = 'ICR/I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+          elif filefilter == 'BL7.0.1.1 XAS (*.txt)':
+            experiment = np.genfromtxt(filename,
+                                       dtype='f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4',
+                                       names=['TimeOfDay', 
+                                              'Time', 
+                                              'MonoEnergy', 
+                                              'BeamCurrent', 
+                                              'ShutterStatus', 
+                                              'Izero', 
+                                              'Counter0', 
+                                              'Counter1', 
+                                              'Counter2', 
+                                              'Counter3', 
+                                              'Counter4', 
+                                              'Counter5', 
+                                              'Counter6', 
+                                              'Gate7Out', 
+                                              'TempA', 
+                                              'TempB', 
+                                              'TempC', 
+                                              'TempD', 
+                                              'ColdCathodeGauge', 
+                                              'SREnergy'],
+                                       skip_header=14)
+
+            spectrum = Spectrum()
+            spectrum.EE = experiment['MonoEnergy']
+            spectrum.data = experiment['Izero']
+            spectrum.name = 'I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+            spectrum = Spectrum()
+            spectrum.EE = experiment['MonoEnergy']
+            spectrum.data = experiment['Counter1']
+            spectrum.name = 'TEY'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+            spectrum = Spectrum()
+            spectrum.EE = experiment['MonoEnergy']
+            spectrum.data = experiment['Counter2']
+            spectrum.name = 'TFY'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+            spectrum = Spectrum()
+            spectrum.EE = experiment['MonoEnergy']
+            spectrum.data = experiment['Counter1']/experiment['Izero']
+            spectrum.name = 'TEY/I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+            spectrum = Spectrum()
+            spectrum.EE = experiment['MonoEnergy']
+            spectrum.data = experiment['Counter2']/experiment['Izero']
+            spectrum.name = 'TFY/I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+          elif filefilter == 'SUPER (*)':
+            pass
+
 
 
     def spectra_names(self):
@@ -752,8 +969,8 @@ class DataHolder(object):
         """
         return self.names
     
-    def sepctra_count(self):
-        return len(self.experiment.blocks)
+    def spectra_count(self):
+        return len(self.spectra)
 
     def get_spectrum(self, index):
         return self.spectra[index]

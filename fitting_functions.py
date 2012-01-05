@@ -10,6 +10,22 @@ def analyzer_function(p, E):
     #print "A: %f, B: %f"%(A,B)
     return BG
 
+def slope(p, E):
+    m, b = p
+    BG = b + m * E
+    return BG
+
+def fitting_arctan(p, E):
+    A, B, u, b = p
+    BG = b + A * arctan( B * (E - u) ) 
+    return BG
+
+def sloped_arctan(p, E):
+    A, B, u, m, b = p
+    BG = b + m * E + A * arctan( B * (E - u) ) 
+    return BG
+sloped_arctan.latex = r'$s_arctan(E) = b + mE + A {\rm arctan} ( B (E - u) )$'
+
 def K(p, E):
     """convolution kernel for Tougaard background"""
     B, C = p

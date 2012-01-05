@@ -54,7 +54,7 @@ class AnalyticBackground:
       res *= self.penalties[i](p)
       i += 1
 
-    res[res<0] = res[res<0]*20
+    res[res<0] = res[res<0]*2
     return res
 
   def optimize_fit(self, E, spectrum):

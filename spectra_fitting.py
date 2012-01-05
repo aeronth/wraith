@@ -42,7 +42,6 @@ class Spectrum:
       spec['peaks'] = self.peaks.get_spec()
     except:
       pass
-
     return spec
 
   def set_spec(self, spec):
@@ -66,7 +65,7 @@ class Spectrum:
     upper = self.E()>=range[0]
     self.EE = self.EE[upper]
     self.data = self.data[upper]
-  
+
     lower = self.E()<=range[1]
     self.EE = self.EE[lower]
     self.data = self.data[lower]
@@ -180,55 +179,55 @@ class Spectrum:
 
     self.add_peak(name, variables, values, penalties, function)
   
-  def plot_f_of_data(self,f,scale=1.0,axes=None):
+  def plot_f_of_data(self,f,scale=1.0,axes=None, offset=0.0):
     if axes==None:
       axes=gca()
-    lines = axes.plot(self.E(), f(self.data/scale),'--',label=f.func_name + "(" + self.name + ")")
+    lines = axes.plot(self.E(), offset+f((self.data)/scale),'--',label=f.func_name + "(" + self.name + ")")
     
-  def plot(self,scale=1.0,axes=None):
+  def plot(self,scale=1.0,axes=None, offset=0.0):
     """Plot the spectra"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), self.data/scale,':o', markersize=3, label=self.name,picker=2)
+    lines = axes.plot(self.E(), offset+(self.data)/scale,':o', markersize=3, label=self.name,picker=2)
 
     for line in lines:
       line.spectrum = self
 
-  def plot_sg1(self,points=5,scale=1.0,axes=None):
+  def plot_sg1(self,points=5,scale=1.0,axes=None, offset=0.0):
     """Plot the Savitski Golay derviative of the spectra"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), self.sg1(points)/scale,':o', markersize=3, label=self.name+'-sg1(%d)'%(points,))
+    lines = axes.plot(self.E(), offset+(self.sg1(points))/scale,':o', markersize=3, label=self.name+'-sg1(%d)'%(points,))
 
-  def plot_nobg(self,scale=1.0, axes=None):
+  def plot_nobg(self,scale=1.0, axes=None, offset=0.0):
     """Plot sepctrum with bg subtracted"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), self.nobg()/scale,':o', markersize=3, label=self.name+'-nobg',picker=2)
+    lines = axes.plot(self.E(), offset+(self.nobg())/scale,':o', markersize=3, label=self.name+'-nobg',picker=2)
     for line in lines:
       line.spectrum = self
 
-  def plot_peaks(self,scale=1.0, axes=None):
+  def plot_peaks(self,scale=1.0, axes=None, offset=0.0):
     """Plot the peaks summed together"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), self.peaks(self.E())/scale,label=self.name+'-peaks')
+    lines = axes.plot(self.E(), offset + (self.peaks(self.E()))/scale,label=self.name+'-peaks')
     for line in lines:
       line.spectrum = self
 
-  def plot_individual_peaks(self,scale=1.0, axes=None):
+  def plot_individual_peaks(self,scale=1.0, axes=None, offset=0.0):
     """Plot the peaks as individual functions"""
     if axes==None:
       axes = gca()
     i = 0
     colors = ['b','g','r','c','m','y','k']
     for peak in self.peaks.peak_list:
-      line = axes.fill_between(self.E(),0, peak(self.E())/scale,label=self.name+'-peak%d'%i,alpha=0.4,color=colors[i])
+      line = axes.fill_between(self.E(),offset, offset + (peak(self.E()))/scale,label=self.name+'-peak%d'%i,alpha=0.4,color=colors[i])
       line.spectrum = self
       peak.line = line
       i += 1
 
-  def plot_individual_peaks_bg(self,scale=1.0, axes=None):
+  def plot_individual_peaks_bg(self,scale=1.0, axes=None, offset=0.0):
     """Plot the peaks as individual functions"""
     if axes==None:
       axes = gca()
@@ -236,62 +235,62 @@ class Spectrum:
     i = 0
     colors = ['b','g','r','c','m','y','k']
     for peak in self.peaks.peak_list:
-      line = axes.fill_between(self.E(), b/scale, (peak(self.E())+b)/scale,label=self.name+'-peak%d'%i,alpha=0.4,color=colors[i])
+      line = axes.fill_between(self.E(), b/scale+offset, offset + (peak(self.E())+b)/scale,label=self.name+'-peak%d'%i,alpha=0.4,color=colors[i])
       line.spectrum = self
       peak.line = line
       i += 1
 
-  def plot_residuals(self,scale=1.0, axes=None):
+  def plot_residuals(self,scale=1.0, axes=None, offset=0.0):
     """plot the residuals"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), self.residuals()/scale,label=self.name+'-residuals')
+    lines = axes.plot(self.E(), offset + (self.residuals())/scale,label=self.name+'-residuals')
     for line in lines:
       line.spectrum = self
 
-  def plot_bg(self,scale=1.0, axes=None):
+  def plot_bg(self,scale=1.0, axes=None, offset=0.0):
     """Plot the bg"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(),(self.abg(self.E()) + self.bg(self.E(), self.data))/scale,label=self.name+'-bg')
+    lines = axes.plot(self.E(), offset + (self.abg(self.E()) + self.bg(self.E(), self.data))/scale,label=self.name+'-bg')
     for line in lines:
       line.spectrum = self
     self.bg.line = lines[0]
 
-  def plot_abg(self,scale=1.0, axes=None):
+  def plot_abg(self,scale=1.0, axes=None, offset=0.0):
     """Plot the bg"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(),(self.abg(self.E()))/scale,label=self.name+'-abg')
+    lines = axes.plot(self.E(),offset+(self.abg(self.E()))/scale,label=self.name+'-abg')
     for line in lines:
       line.spectrum = self
 
-  def plot_kbg(self,scale=1.0, axes=None):
+  def plot_kbg(self,scale=1.0, axes=None, offset=0.0):
     """Plot the bg"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(),(self.bg(self.E(), self.data))/scale,label=self.name+'-kbg')
+    lines = axes.plot(self.E(),offset+(self.bg(self.E(), self.data))/scale,label=self.name+'-kbg')
     for line in lines:
       line.spectrum = self
 
-  def plot_full_fit(self,scale=1.0, axes=None):
+  def plot_full_fit(self,scale=1.0, axes=None, offset=0.0):
     """Plot the current fit including peaks and bg"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(),(self.peaks(self.E())+self.bg(self.E(),self.data))/scale,label=self.name+'-fullfit')
+    lines = axes.plot(self.E(),offset + (self.peaks(self.E())+self.bg(self.E(),self.data))/scale,label=self.name+'-fullfit')
     for line in lines:
       line.spectrum = self
 
-  def plot_full_summary(self,scale=1.0, axes=None,displayParams=True):
+  def plot_full_summary(self,scale=1.0, axes=None, displayParams=True, offset=0.0):
     """Plot the spectrum, the bg, and the full fit"""
     if axes==None:
       axes = gca()
-    self.plot(scale, axes)
-    self.plot_bg(scale, axes)
-    self.plot_abg(scale, axes)
-    self.plot_kbg(scale, axes)
-    self.plot_full_fit(scale, axes)
-    self.plot_individual_peaks_bg(scale, axes)
+    self.plot(scale, axes, offset)
+    self.plot_bg(scale, axes, offset)
+    self.plot_abg(scale, axes, offset)
+    self.plot_kbg(scale, axes, offset)
+    self.plot_full_fit(scale, axes, offset)
+    self.plot_individual_peaks_bg(scale, axes, offset)
 
     if displayParams:
       if isinstance(self.bg, Background):
@@ -343,13 +342,13 @@ class Spectrum:
         an.draggable()
         an.fit_object = peak
   
-  def plot_full_summary_nobg(self,scale=1.0, axes=None, displayParams=True):
+  def plot_full_summary_nobg(self,scale=1.0, axes=None, displayParams=True, offset=0.0):
     """Plot the spectrum, the bg, and the full fit"""
     if axes==None:
       axes = gca()
-    self.plot_nobg(scale, axes)
-    self.plot_peaks(scale, axes)
-    self.plot_individual_peaks(scale, axes)
+    self.plot_nobg(scale, axes, offset)
+    self.plot_peaks(scale, axes, offset)
+    self.plot_individual_peaks(scale, axes, offset)
 
     if displayParams:
       for peak in self.peaks:
@@ -377,129 +376,3 @@ class Spectrum:
   
   def __call__(self):
     return self.data
-  
-def load_BL62_text_files(file_name_filter):
-  """helper function to load a bunch of spectra from SSRL BL6-2 text files in the current dir"""
-  files = os.listdir('.')
-
-  spectra = {}
-  
-  for file in files:
-    m = re.search('('+file_name_filter+'.*)\.dat',file)
-    if (m):
-      filename = file
-      name = filename
-      spectra[name] = Spectrum()
-      spectra[name].name = name
-      data = np.genfromtxt(filename,skip_header=12)
-      #print data
-      spectra[name].EE = data[:,0]
-      spectra[name].data = data[:,1:]
-    
-  return spectra
-
-def load_SUPER_text_files(file_name_filter):
-  """helper function to load a bunch of spectra from AugerScan text files in the current dir"""
-  files = os.listdir('.')
-
-  spectra = {}
-  
-  for file in files:
-    m = re.search('('+file_name_filter+'.*)\.\d\d\d',file)
-    if (m):
-      filename = file
-      name = filename
-      spectra[name] = Spectrum()
-      spectra[name].name = name
-      data = np.genfromtxt(filename,skip_header=12)
-      #print data
-      spectra[name].EE = data[:,0]
-      spectra[name].data = data[:,1:]
-    
-  return spectra
-
-def load_BL7_XES_files(file_name_filter):
-  """helper function to load a bunch of spectra from ALS BL 7.0.1.1 XES text files in the current dir"""
-  files = os.listdir('.')
-  
-  spectra = {}
-  
-  for file in files:
-    m = re.search('('+file_name_filter+'.*)\_spec.txt',file)
-    if (m):
-      filename = file
-      name = filename
-      spectra[name] = Spectrum()
-      spectra[name].name = name
-      data = np.genfromtxt(filename,skip_header=0)
-      #print data
-      spectra[name].EE = data[:-1,0]
-      spectra[name].data = data[:-1,1]
-      
-  return spectra
-
-def load_BL7_XAS_files(file_name_filter):
-  """helper function to load a bunch of spectra from ALS BL 7.0.1.1 XAS text files in the current dir"""
-  files = os.listdir('.')
-  
-  spectra = {}
-  
-  for file in files:
-    m = re.search('('+file_name_filter+'.*)\.xas$',file)
-    if (m):
-      filename = file
-      name = filename
-      spectra[name] = Spectrum()
-      spectra[name].name = name
-      data = np.genfromtxt(filename,skip_header=5)
-      #print data
-      spectra[name].EE = data[:,0]
-      spectra[name].data = data[:,1:]
-      
-  return spectra
-
-def load_AugerScan_text_files(file_name_filter):
-  """helper function to load a bunch of spectra from AugerScan text files in the current dir"""
-  files = os.listdir('.')
-
-  special_chars = r'[ \t\(\"\(\)\*\&\^\%\$\#\@\!\_\+\-\=\[\]\{\}\|\;\'\"\:\/\.\,\<\>\\\?]'
-  
-  spectra = {}
-  E=[]
-  data=[]
-  i = 0;
-  for file in files:
-    m = re.search('('+file_name_filter+')\.txt',file)
-    if (m):
-      filename = file
-      print filename
-      f = open(filename, 'r')
-      name = m.group(1)
-      header = True
-      for line in f:
-        if (re.search('Element',line)):
-          print '+e'
-          header = False
-          m = re.search('Element\s(.*);.*;\sDepth Cycle (\d+).*;\sTime Per Step (\d+);\sSweeps (\d+);.*',line)
-          #print m.group(0)
-          label = i#name+'-'+line
-          i = i+1
-          #print '+' + label
-          spectrum = Spectrum()
-          spectrum.element = m.group(1)
-          spectrum.depth_cycle = double(m.group(2))
-          spectrum.time_per_step = double(m.group(3))
-          spectrum.sweeps = double(m.group(4))
-          spectrum.name = name
-          spectrum.E=array([])
-          spectrum.data=array([])
-          spectra[label] = spectrum
-        elif header:
-          continue
-        elif (re.search('^[\d\.]+\s\d+\s*$',line)):
-          m = re.search('^([\d\.]+)\s(\d+)',line)
-          #print m.group(0)
-          spectra[label].EE = append(spectra[label].E, double(m.group(1)))
-          spectra[label].data = append(spectra[label].data, double(m.group(2)))
-
-  return spectra
