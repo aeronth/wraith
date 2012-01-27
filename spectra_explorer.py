@@ -2,14 +2,15 @@
 
 import sys, os, csv, string
 #from PySide.QtCore import *
-from PyQt4.QtCore import pyqtSignal as Signal
-from PyQt4.QtCore import pyqtSlot as Slot
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
-from PyQt4 import QtCore, QtGui
+from PySide.QtCore import Signal
+from PySide.QtCore import Slot
+from PySide.QtCore import *
+from PySide.QtGui import *
+from PySide import QtCore, QtGui
 
 import matplotlib
 matplotlib.use('Qt4Agg')
+matplotlib.rcParams['backend.qt4']= "PySide"
 
 from pylab import *
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
@@ -217,8 +218,8 @@ class Form(QMainWindow):
     def load_file(self, filename=None):
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFiles)
-        dialog.setNameFilter('BL7.0.1.1 XAS (*.txt);; VAMAS (*.vms);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
-        self.filefilter = 'BL7.0.1.1 XAS (*.txt)'
+        dialog.setNameFilter('VAMAS (*.vms);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
+        self.filefilter = 'VAMAS (*.vms)'
         dialog.filterSelected.connect(self.filterSelected)
 
         if dialog.exec_():
@@ -226,7 +227,7 @@ class Form(QMainWindow):
 
         for filename in filenames:
           if filename:
-            file = QString(os.path.basename(str(filename)))
+            file = os.path.basename(str(filename))
             self.files[file] = DataHolder()
             self.files[file].load_from_file(str(filename), str(self.filefilter))
             self.fill_series_list()
@@ -255,9 +256,9 @@ class Form(QMainWindow):
     
     def update_file_checks(self, item):
         for file in range(self.series_list_root.rowCount()):
-          if item == self.series_list_root.child(file):
+          if id(item) == id(self.series_list_root.child(file)):
             model_index = self.series_list_root.child(file).index()
-            checked = self.series_list_model.data(model_index,Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index,Qt.CheckStateRole) == Qt.Checked
             for row in range(self.series_list_root.child(file).rowCount()):
               if checked:
                 self.series_list_root.child(file).child(row).setCheckState(Qt.Checked)
@@ -287,8 +288,8 @@ class Form(QMainWindow):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
             checked = self.series_list_model.data(model_index,
-                Qt.CheckStateRole) == QVariant(Qt.Checked)
-            name = str(self.series_list_model.data(model_index).toString())
+                Qt.CheckStateRole) == (Qt.Checked)
+            name = str(self.series_list_model.data(model_index))
             if checked:
                 has_series = True
                 filename = self.series_list_root.child(file).text()
@@ -303,8 +304,8 @@ class Form(QMainWindow):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
             checked = self.series_list_model.data(model_index,
-                Qt.CheckStateRole) == QVariant(Qt.Checked)
-            name = str(self.series_list_model.data(model_index).toString())
+                Qt.CheckStateRole) == (Qt.Checked)
+            name = str(self.series_list_model.data(model_index))
             
             if checked:
                 filename = self.series_list_root.child(file).text()
@@ -355,7 +356,7 @@ class Form(QMainWindow):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
-            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
             if checked:
                 filename = self.series_list_root.child(file).text()
                 self.files[filename].get_spectrum(row).clear_peaks()
@@ -366,7 +367,7 @@ class Form(QMainWindow):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
-            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
             if checked:
                 filename = self.series_list_root.child(file).text()
                 print 'bg_cleared ' + filename 
@@ -387,7 +388,7 @@ class Form(QMainWindow):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
-            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
             if checked:
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
@@ -404,7 +405,7 @@ class Form(QMainWindow):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
-            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
             if checked:
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
@@ -421,7 +422,7 @@ class Form(QMainWindow):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
-            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
             if checked:
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
@@ -432,7 +433,7 @@ class Form(QMainWindow):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
             model_index = self.series_list_root.child(file).child(row).index()
-            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+            checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
             if checked:
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
@@ -443,16 +444,22 @@ class Form(QMainWindow):
       for file in range(self.series_list_root.rowCount()):
         for row in range(self.series_list_root.child(file).rowCount()):
           model_index = self.series_list_root.child(file).child(row).index()
-          checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+          checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
           if checked:
             filename = self.series_list_root.child(file).text()
             spectrum = self.files[filename].get_spectrum(row)
-            outfilename = filename + '- region' + str(row) + ' - ' + spectrum.name + '.csv'
-            print 'write_summary: ' + outfilename 
-            f = open(outfilename, 'w')
-            f.write('spectrum = ')
-            pprint(spectrum.get_spec(), f)
-            f.close()
+            outfilename = filename + ' - region' + str(row) + ' - ' + spectrum.name + '.csv'
+            print 'write_summary: ' + outfilename
+            #f = open(outfilename, 'w')
+            out = array([])
+            out = c_[spectrum.E(), spectrum.data]
+            for peak in spectrum.peaks.peak_list:
+              out = c_[out,peak(spectrum.E())]
+            out = c_[out,spectrum.bg(spectrum.E(),spectrum.data)]
+            out = c_[out,spectrum.peaks(spectrum.E())]
+            #f.write(out)
+            #f.close()
+            savetxt(str(outfilename), out, delimiter=",", fmt="%10.5f")
 
     def plot_summary_csv(self):
       pass
@@ -463,7 +470,7 @@ class Form(QMainWindow):
       for file in range(self.series_list_root.rowCount()):
         for row in range(self.series_list_root.child(file).rowCount()):
           model_index = self.series_list_root.child(file).child(row).index()
-          checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == QVariant(Qt.Checked)
+          checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
           if checked:
             filename = self.series_list_root.child(file).text()
             spectrum = self.files[filename].get_spectrum(row)
@@ -499,6 +506,7 @@ class Form(QMainWindow):
         self.parameterDialog.show()
 
     def on_pick(self, event):
+        print "picked!"
         if isinstance(event.artist, matplotlib.text.Annotation):
           self.modify_fit(event.artist)
           return True
@@ -742,13 +750,9 @@ class Form(QMainWindow):
         self.button_load_fits.clicked.connect(self.load_fits)
         self.button_load_fits.setShortcut("Ctrl+L")
 
-        self.button_write_summary = QPushButton("&Plot Summary")
+        self.button_write_summary = QPushButton("&Export Summary")
         self.button_write_summary.clicked.connect(self.write_summary_csv)
-        self.button_write_summary.setShortcut("Ctrl+P")
-
-        self.button_plot_summary = QPushButton("&Export Summary")
-        self.button_plot_summary.clicked.connect(self.plot_summary_csv)
-        self.button_plot_summary.setShortcut("Ctrl+E")
+        self.button_write_summary.setShortcut("Ctrl+E")
 
         self.button_average = QPushButton("&Average")
         self.button_average.clicked.connect(self.average)
@@ -763,7 +767,6 @@ class Form(QMainWindow):
         mods_box.addWidget(self.button_adjust_offset,1,0)
         mods_box.addWidget(self.button_write_fits,1,1)
         mods_box.addWidget(self.button_load_fits,1,2)
-        mods_box.addWidget(self.button_plot_summary,3,0)
         mods_box.addWidget(self.button_write_summary,3,1)
         mods_box.addWidget(self.button_average,3,2)
 

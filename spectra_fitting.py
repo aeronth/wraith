@@ -311,7 +311,8 @@ class Spectrum:
                       bbox=dict(boxstyle="roundtooth",fc='%s'%col,alpha=0.2),
                       fontsize='small',
                       family='sans-serif')
-        an.draggable()
+        an.set_picker(True)
+        #an.draggable()
         an.fit_object = self.bg
         
       for peak in self.peaks:
@@ -339,7 +340,8 @@ class Spectrum:
                       family='sans-serif')
         an.get_bbox_patch().set_facecolor(col[0])
         an.get_bbox_patch().set_alpha(col[0][3])
-        an.draggable()
+        an.set_picker(True)
+        #an.draggable()
         an.fit_object = peak
   
   def plot_full_summary_nobg(self,scale=1.0, axes=None, displayParams=True, offset=0.0):
@@ -371,7 +373,9 @@ class Spectrum:
                       family='sans-serif')
         an.get_bbox_patch().set_facecolor(col[0])
         an.get_bbox_patch().set_alpha(col[0][3])
-        an.draggable()
+        an.set_picker(True)
+        #an.draggable()
+        print an.pickable()
         an.fit_object = peak
   
   def __call__(self):
