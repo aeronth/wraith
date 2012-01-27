@@ -26,7 +26,8 @@ class Penalty:
 
 class AnalyticBackground:
 
-  def __init__(self, name, variables, values, penalties, f):
+  def __init__(self, spectrum, name, variables, values, penalties, f):
+    self.spectrum = spectrum
     self.name = name
     self.variables = variables
     self.values = values
@@ -72,7 +73,8 @@ class AnalyticBackground:
 class Background:
   """Implements a generic background based on a convolution kernel function"""
 
-  def __init__(self, name='tougaard', variables=['B','D'], values=r_[100,100], penalties=[Penalty(r_[0,100],no_penalty)], kernel=K, kernel_end=200):
+  def __init__(self, spectrum, name='tougaard', variables=['B','D'], values=r_[100,100], penalties=[Penalty(r_[0,100],no_penalty)], kernel=K, kernel_end=200):
+    self.spectrum = spectrum
     self.name = name
     self.values = values
     self.variables = variables
@@ -138,12 +140,14 @@ class Background:
 
 class Peak:
 
-  def __init__(self, name='default', variables=['A','\mu','\sigma','m'], values=r_[100,100,1,0.5], penalties=[Penalty(r_[0,100],no_penalty)], f=gl):
+  def __init__(self, spectrum, name='default', variables=['A','\mu','\sigma','m'], values=r_[100,100,1,0.5], penalties=[Penalty(r_[0,100],no_penalty)], f=gl):
+    self.spectrum = spectrum
     self.name = name
     self.variables = variables
     self.values = values
     self.penalties = penalties
     self.f = f
+    self.optimization_history = array([])
    
   def set_spec(self, spec):
     self.penalties = []
@@ -153,6 +157,7 @@ class Peak:
     self.variables = spec['variables']
     self.values = spec['values']
     self.f = eval(spec['function'])
+    self.optimization_history = c_[optimization_history,r_[self.values,sum(res)]]
 
   def get_spec(self):
     ranges = []
@@ -183,8 +188,9 @@ class Peak:
 
 class Peaks:
 
-  def __init__(self):
+  def __init__(self, spectrum):
     """something will go here"""
+    self.spectrum = spectrum
     self.peak_list = []
 
   def __getitem__(self, i):
@@ -219,6 +225,7 @@ class Peaks:
       i = 0
       p = param_eater[:peak.values.size]
       param_eater = param_eater[peak.values.size:]
+      peak.optimization_history = c_[optimization_history,r_[values,sum(res)]]
       for value in p:
         pen = peak.penalties[i](value)
         res *= pen

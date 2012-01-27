@@ -42,7 +42,7 @@ class ParameterSlider(QAbstractSlider):
     self.slider.setMinimum(0)
     self.slider.setMaximum(1000)
     self.slider.setSingleStep(1)
-    self.slider.valueChanged[int].connect(self.valueChanged)
+    self.slider.valueChanged[int].connect(self.sliderChanged)
 
     inLabel = QLabel('\in (')
     commaLabel = QLabel(',')
@@ -72,7 +72,7 @@ class ParameterSlider(QAbstractSlider):
     mainLayout.addWidget(self.slider)
     self.setLayout(mainLayout)
 
-  def valueChanged(self, value):
+  def sliderChanged(self, value):
     if self.ignore_signals:
       return
   
@@ -134,6 +134,7 @@ class ParameterDialog(QDialog):
           paramSlider.setMinimum(range[0])
           paramSlider.setMaximum(range[1])
           paramSlider.changed.connect(self.update)
+          paramSlider.changed.connect(fit_object.opt_window.)
 
           parametersLayout.addWidget(paramSlider)
 
@@ -160,16 +161,76 @@ class ParameterDialog(QDialog):
       self.fit_object.set_spec(spec)
       self.parent.on_show()
 
+class OptimizationWindow(QMainWindow):
+  def __init__(self, fit_object, parent=None):
+    super(OptimizationWindow,self).__init__(parent)
+
+    self.parent = parent
+
+    self.fit_object = fit_object
+
+    spec = fit_object.get_spec()
+
+    self.main_frame = QWidget()
+
+    mainLayout = QVBoxLayout()
+    self.setWindowTitle('Optimization - ' + fit_object.name)
+
+    self.dpi = 100
+    self.fig = Figure((6.0, 4.0), dpi=self.dpi, facecolor='w', edgecolor='k')
+    self.canvas = FigureCanvas(self.fig)
+    self.canvas.setParent(self.main_frame)
+
+    N = size(spec['variables'])
+    i = 1
+    for var, val, range in zip(spec['variables'], spec['values'], spec['ranges']):
+        self.axes[var] = Subplot(self.fig,N,1,i)
+        i += 1
+        self.fig.add_subplot(self.axes[var])
+        self.axes[var].set_title(var)
+        self.axes[var].set_ylim(range)
+    
+    self.opt_axes = Subplot(self.fig,N,1,i)
+
+    self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
+    
+    mainLayout.addWidget(self.canvas)
+    mainLayout.addWidget(self.mpl_toolbar)
+
+    self.main_frame.setLayout(mainLayout)
+
+    self.setCentralWidget(self.main_frame)
+    self.show()
+
+  def update(self):
+    spec = self.fit_object.get_spec()
+    i=0
+    for var, val, range in zip(spec['variables', spec['values'], spec['ranges']):
+        self.axes[var].cla()
+        self.axes[var].plot(optimization_history[:,i])
+        i+=1
+        self.axes[var].set_ylim(range)
+
+    points = optimization_history[:,i]
+    points = points[points<max(spectrum.data)*1e5]
+    points = points[points>0]
+    self.opt_axes.cla()
+    self.opt_axes.plot(optimization_history[:,i])
+
+    self.canvas.draw()
+    self.show()
+
+
 class AverageWindow(QMainWindow):
     def __init__(self, spectrum, parent=None):
       super(AverageWindow,self).__init__(parent)
-
+  
       self.parent = parent
     
       self.spectrum = spectrum
-
+  
       self.main_frame = QWidget()
-
+  
       mainLayout = QVBoxLayout()
       self.setWindowTitle('Average')
 
@@ -429,6 +490,13 @@ class Form(QMainWindow):
                 spectrum.offset += offset
       self.on_show()
 
+    def plot_optimization_history(self, spectrum):
+      for peak in spectrum.peaks:
+        if not hasattr(peak, 'optWin'):
+          peak.optimization_window = OptimizationWindow(parent=self)
+
+        peak.optimization_window.update()
+         
     def optimize_peaks(self):
         for file in range(self.series_list_root.rowCount()):
           for row in range(self.series_list_root.child(file).rowCount()):
@@ -438,6 +506,7 @@ class Form(QMainWindow):
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
                 spectrum.peaks.optimize_fit(spectrum.E(), spectrum.nobg())
+                self.plot_optimization_history(spectrum)
         self.on_show()
       
     def write_summary_csv(self):
@@ -506,7 +575,6 @@ class Form(QMainWindow):
         self.parameterDialog.show()
 
     def on_pick(self, event):
-        print "picked!"
         if isinstance(event.artist, matplotlib.text.Annotation):
           self.modify_fit(event.artist)
           return True
@@ -628,7 +696,8 @@ class Form(QMainWindow):
                                     r_[-1e9,1e9] ]
                       }
             event.artist.spectrum.guess_abg_from_spec(bg_spec)
-            
+
+        self.plot_optimization_history(event.artist.spectrum)   
         self.on_show()
 
         return True

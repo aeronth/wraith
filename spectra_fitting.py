@@ -16,11 +16,11 @@ class Spectrum:
     self.offset = 0
     self.bg = lambda E, data: zeros(E.size)
     self.abg = lambda E: zeros(E.size)
-    self.peaks = Peaks()
+    self.peaks = Peaks(self)
     self.name = "unnamed"
 
   def clear_peaks(self):
-    self.peaks = Peaks()
+    self.peaks = Peaks(self)
 
   def clear_bg(self):
     self.bg = lambda E, data: zeros(E.size)
@@ -47,7 +47,7 @@ class Spectrum:
   def set_spec(self, spec):
     self.clear_abg()
     self.bg = Background()
-    self.peaks = Peaks()
+    self.peaks = Peaks(self)
     self.offset = spec['offset']
     self.bg.set_spec(spec['bg'])
     self.peaks.set_spec(spec['peaks'])
@@ -137,7 +137,7 @@ class Spectrum:
 
   def add_peak(self, name, variables, values, penalties, f):
     """Add a peak with fitting params, using function f"""
-    self.peaks.add_peak(Peak(name, variables, values, penalties, f))
+    self.peaks.add_peak(Peak(self, name, variables, values, penalties, f))
     self.peaks.optimize_fit(self.E(), self.nobg())
 
   def guess_abg_from_spec(self, spec):
@@ -375,7 +375,6 @@ class Spectrum:
         an.get_bbox_patch().set_alpha(col[0][3])
         an.set_picker(True)
         #an.draggable()
-        print an.pickable()
         an.fit_object = peak
   
   def __call__(self):
