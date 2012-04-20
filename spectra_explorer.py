@@ -20,7 +20,6 @@ from spectra_fitting import *
 from VAMAS import *
 from pprint import *
 from mpl_toolkits.axisartist import Subplot
-from data_formats import *
 
 
 class ParameterSlider(QAbstractSlider):
@@ -270,6 +269,7 @@ class Form(QMainWindow):
     def __init__(self, parent=None):
         super(Form, self).__init__(parent)
         self.setWindowTitle('Interactive XPS Explorer')
+        self.ignore_signals = False
 
         self.files = {}
         #self.data = DataHolder()
@@ -290,7 +290,7 @@ class Form(QMainWindow):
     def load_file(self, filename=None):
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFiles)
-        dialog.setNameFilter('VAMAS (*.vms);; AugerScan (*.txt);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
+        dialog.setNameFilter('VAMAS (*.vms);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
         self.filefilter = 'VAMAS (*.vms)'
         dialog.filterSelected.connect(self.filterSelected)
 
@@ -343,6 +343,9 @@ class Form(QMainWindow):
         self.on_show()
 
     def on_show(self):
+        if self.ignore_signals:
+          return
+      
         self.axes.clear()        
         self.axes.set_autoscale_on(self.autoscale_cb.isChecked())
         self.axes.grid(True)
@@ -366,8 +369,26 @@ class Form(QMainWindow):
                 has_series = True
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
+                
                 if self.BG_cb.isChecked():
-                  m = max(spectrum.data)
+                  if self.NE_cb.isChecked():
+                    m = max(spectrum.data)
+                  else:
+                    pnts = int(self.smoothing_le.text())
+                    if pnts<2:
+                      pnts=2
+
+                    if pnts>12:
+                      pnts=12
+
+                    self.ignore_signals = True
+                    try:
+                      self.smoothing_le.setText( str(pnts) )
+                    except:
+                      pass
+                    self.ignore_signals = False
+                  
+                    m = max(spectrum.sg1(points=2*pnts + 1))
                 else:
                   m = max(spectrum.nobg())
                 if m>max_val:
@@ -394,8 +415,23 @@ class Form(QMainWindow):
                       scale = max_val
                     spectrum.plot_full_summary_nobg(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
                 if self.dNE_cb.isChecked():
-                  spectrum.plot_sg1(scale=scale,points=5,axes=self.axes,offset=offset)
+                  pnts = int(self.smoothing_le.text())
+                  if pnts<2:
+                    pnts=2
 
+                  if pnts>12:
+                    pnts=12
+
+                  self.ignore_signals = True
+                  try:
+                    self.smoothing_le.setText( str(pnts) )
+                  except:
+                    pass
+                  self.ignore_signals = False
+                  
+                  spectrum.plot_sg1(scale=scale,points=2*pnts + 1,axes=self.axes,offset=offset)
+                  self.status_text.setText(spectrum.name)
+            
           if self.stacked_cb.isChecked():
             if self.normalize_cb.isChecked():
               if has_series:
@@ -502,11 +538,6 @@ class Form(QMainWindow):
       self.on_show()
 
     def plot_optimization_history(self, spectrum):
-      print "plot opt history"
-      if not hasattr(spectrum.bg, 'optimization_window'):
-        spectrum.bg.optimization_window = OptimizationWindow(spectrum.bg, parent=self)
-      spectrum.bg.optimization_window.update()
-
       for peak in spectrum.peaks:
         if not hasattr(peak, 'optimization_window'):
           peak.optimization_window = OptimizationWindow(peak, parent=self)
@@ -759,6 +790,9 @@ class Form(QMainWindow):
         self.dNE_cb.setChecked(False)
         self.dNE_cb.stateChanged.connect(self.on_show)
 
+        self.smoothing_le = QLineEdit("2")
+        self.smoothing_le.textChanged.connect(self.on_show)
+
         self.BG_cb = QCheckBox("&Show Background")
         self.BG_cb.setChecked(True)
         self.BG_cb.stateChanged.connect(self.on_show)
@@ -776,6 +810,7 @@ class Form(QMainWindow):
         cb_hbox1.addWidget(self.autoscale_cb)
         cb_hbox2.addWidget(self.NE_cb)
         cb_hbox2.addWidget(self.dNE_cb)
+        cb_hbox2.addWidget(self.smoothing_le)
         cb_hbox3.addWidget(self.normalize_cb)
         cb_hbox3.addWidget(self.BG_cb)
         cb_hbox3.addWidget(self.stacked_cb)
@@ -936,13 +971,16 @@ class DataHolder(object):
         if filename:
           if filefilter == 'VAMAS (*.vms)':
             experiment = VAMASExperiment(filename)
+            i = 1
             for block in experiment.blocks:
-                self.names.append(block.sample_identifier + '-' + block.block_identifier)
+                treename = 'Block-' + str(i) + '-' + block.sample_identifier + '-' + block.block_identifier
                 spectrum = Spectrum()
                 spectrum.EE = block.abscissa()
-                spectrum.name = (block.sample_identifier + '-' + block.block_identifier)
+                spectrum.name = os.path.basename(filename) + '-' + treename
                 spectrum.data = block.ordinate(0)/(block.number_of_scans_to_compile_this_block * block.signal_collection_time)
                 self.spectra.append(spectrum)
+                self.names.append(treename)
+                i += 1
           elif filefilter == 'SSRL (*.dat)':
             experiment = np.genfromtxt(filename,skip_header=37)
 
@@ -988,7 +1026,29 @@ class DataHolder(object):
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
           elif filefilter == 'BL7.0.1.1 XAS (*.txt)':
-            experiment = read_bl7011_xas(filename)
+            experiment = np.genfromtxt(filename,
+                                       dtype='f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4',
+                                       names=['TimeOfDay', 
+                                              'Time', 
+                                              'MonoEnergy', 
+                                              'BeamCurrent', 
+                                              'ShutterStatus', 
+                                              'Izero', 
+                                              'Counter0', 
+                                              'Counter1', 
+                                              'Counter2', 
+                                              'Counter3', 
+                                              'Counter4', 
+                                              'Counter5', 
+                                              'Counter6', 
+                                              'Gate7Out', 
+                                              'TempA', 
+                                              'TempB', 
+                                              'TempC', 
+                                              'TempD', 
+                                              'ColdCathodeGauge', 
+                                              'SREnergy'],
+                                       skip_header=14)
 
             spectrum = Spectrum()
             spectrum.EE = experiment['MonoEnergy']
@@ -1022,17 +1082,6 @@ class DataHolder(object):
             spectrum.EE = experiment['MonoEnergy']
             spectrum.data = experiment['Counter2']/experiment['Izero']
             spectrum.name = 'TFY/I0'
-            self.spectra.append(spectrum)
-            self.names.append(spectrum.name)
-
-          elif filefilter == 'AugerScan (*.txt)':
-            experiment = read_augerscan(filename)
-            spectrum = Spectrum()
-            spectrum.EE = experiment['Energy']
-            print spectrum.EE
-            spectrum.data = experiment['Counts']
-            print spectrum.data
-            spectrum.name = 'Region 1'
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
 
