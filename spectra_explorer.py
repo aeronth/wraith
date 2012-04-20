@@ -20,6 +20,7 @@ from spectra_fitting import *
 from VAMAS import *
 from pprint import *
 from mpl_toolkits.axisartist import Subplot
+from data_formats import *
 
 
 class ParameterSlider(QAbstractSlider):
@@ -134,7 +135,7 @@ class ParameterDialog(QDialog):
           paramSlider.setMinimum(range[0])
           paramSlider.setMaximum(range[1])
           paramSlider.changed.connect(self.update)
-          paramSlider.changed.connect(fit_object.opt_window.)
+          paramSlider.changed.connect(fit_object.optimization_window.update)
 
           parametersLayout.addWidget(paramSlider)
 
@@ -181,16 +182,18 @@ class OptimizationWindow(QMainWindow):
     self.canvas = FigureCanvas(self.fig)
     self.canvas.setParent(self.main_frame)
 
-    N = size(spec['variables'])
+    N = size(spec['variables'])+1
     i = 1
+    self.axes = {}
     for var, val, range in zip(spec['variables'], spec['values'], spec['ranges']):
-        self.axes[var] = Subplot(self.fig,N,1,i)
+        self.axes[var] = Subplot(self.fig,ceil(N/2.0),2,i)
         i += 1
         self.fig.add_subplot(self.axes[var])
-        self.axes[var].set_title(var)
+        self.axes[var].set_ylabel("$"+var+"$")
         self.axes[var].set_ylim(range)
     
-    self.opt_axes = Subplot(self.fig,N,1,i)
+    self.opt_axes = Subplot(self.fig,ceil(N/2.0),2,N)
+    self.fig.add_subplot(self.opt_axes)
 
     self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
     
@@ -201,21 +204,29 @@ class OptimizationWindow(QMainWindow):
 
     self.setCentralWidget(self.main_frame)
     self.show()
+    self.max_r = max(self.fit_object.spectrum.data)*1e2
 
   def update(self):
     spec = self.fit_object.get_spec()
     i=0
-    for var, val, range in zip(spec['variables', spec['values'], spec['ranges']):
+    window_size = 2500
+    l = len(self.fit_object.optimization_history[i,:])
+    for var, val, range in zip(spec['variables'], spec['values'], spec['ranges']):
         self.axes[var].cla()
-        self.axes[var].plot(optimization_history[:,i])
+        self.axes[var].plot(self.fit_object.optimization_history[i,:])
         i+=1
         self.axes[var].set_ylim(range)
+        self.axes[var].set_ylabel("$"+var+"$")
+        self.axes[var].set_xlim([l-window_size,l])
 
-    points = optimization_history[:,i]
-    points = points[points<max(spectrum.data)*1e5]
-    points = points[points>0]
+    points = self.fit_object.optimization_history[i,:]
+    points[points>self.max_r] = self.max_r
+    #points[points<0] = 0
     self.opt_axes.cla()
-    self.opt_axes.plot(optimization_history[:,i])
+    self.opt_axes.plot(points)
+    self.opt_axes.set_ylabel("$\sum R^2$")
+    self.opt_axes.set_xlim([l-window_size,l])
+    self.opt_axes.set_ylim(mean(points[-window_size:])+r_[-6,6]*std(points[-window_size:]))
 
     self.canvas.draw()
     self.show()
@@ -279,7 +290,7 @@ class Form(QMainWindow):
     def load_file(self, filename=None):
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFiles)
-        dialog.setNameFilter('VAMAS (*.vms);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
+        dialog.setNameFilter('VAMAS (*.vms);; AugerScan (*.txt);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
         self.filefilter = 'VAMAS (*.vms)'
         dialog.filterSelected.connect(self.filterSelected)
 
@@ -491,9 +502,14 @@ class Form(QMainWindow):
       self.on_show()
 
     def plot_optimization_history(self, spectrum):
+      print "plot opt history"
+      if not hasattr(spectrum.bg, 'optimization_window'):
+        spectrum.bg.optimization_window = OptimizationWindow(spectrum.bg, parent=self)
+      spectrum.bg.optimization_window.update()
+
       for peak in spectrum.peaks:
-        if not hasattr(peak, 'optWin'):
-          peak.optimization_window = OptimizationWindow(parent=self)
+        if not hasattr(peak, 'optimization_window'):
+          peak.optimization_window = OptimizationWindow(peak, parent=self)
 
         peak.optimization_window.update()
          
@@ -972,29 +988,7 @@ class DataHolder(object):
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
           elif filefilter == 'BL7.0.1.1 XAS (*.txt)':
-            experiment = np.genfromtxt(filename,
-                                       dtype='f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4',
-                                       names=['TimeOfDay', 
-                                              'Time', 
-                                              'MonoEnergy', 
-                                              'BeamCurrent', 
-                                              'ShutterStatus', 
-                                              'Izero', 
-                                              'Counter0', 
-                                              'Counter1', 
-                                              'Counter2', 
-                                              'Counter3', 
-                                              'Counter4', 
-                                              'Counter5', 
-                                              'Counter6', 
-                                              'Gate7Out', 
-                                              'TempA', 
-                                              'TempB', 
-                                              'TempC', 
-                                              'TempD', 
-                                              'ColdCathodeGauge', 
-                                              'SREnergy'],
-                                       skip_header=14)
+            experiment = read_bl7011_xas(filename)
 
             spectrum = Spectrum()
             spectrum.EE = experiment['MonoEnergy']
@@ -1028,6 +1022,17 @@ class DataHolder(object):
             spectrum.EE = experiment['MonoEnergy']
             spectrum.data = experiment['Counter2']/experiment['Izero']
             spectrum.name = 'TFY/I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+          elif filefilter == 'AugerScan (*.txt)':
+            experiment = read_augerscan(filename)
+            spectrum = Spectrum()
+            spectrum.EE = experiment['Energy']
+            print spectrum.EE
+            spectrum.data = experiment['Counts']
+            print spectrum.data
+            spectrum.name = 'Region 1'
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
 

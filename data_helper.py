@@ -2,8 +2,9 @@ import os
 import re
 from pylab import *
 from scipy.optimize import leastsq
-from fitting_machinery import *
+from spectra_fitting import *
 from pprint import *
+from data_formats import *
 
 
 def load_BL62_text_files(file_name_filter):
@@ -21,7 +22,7 @@ def load_BL62_text_files(file_name_filter):
       spectra[name].name = name
       data = np.genfromtxt(filename,skip_header=37)
       #print data
-      spectra[name].E = data[:,1]
+      spectra[name].EE = data[:,1]
       spectra[name].data = data[:,1:]
     
   return spectra
@@ -41,7 +42,7 @@ def load_SUPER_text_files(file_name_filter):
       spectra[name].name = name
       data = np.genfromtxt(filename,skip_header=12)
       #print data
-      spectra[name].E = data[:,0]
+      spectra[name].EE = data[:,0]
       spectra[name].data = data[:,1:]
     
   return spectra
@@ -61,7 +62,7 @@ def load_BL7_XES_files(file_name_filter):
       spectra[name].name = name
       data = np.genfromtxt(filename,skip_header=0)
       #print data
-      spectra[name].E = data[:-1,0]
+      spectra[name].EE = data[:-1,0]
       spectra[name].data = data[:-1,1]
       
   return spectra
@@ -72,18 +73,28 @@ def load_BL7_XAS_files(file_name_filter):
   
   spectra = {}
   
-  for file in files:
-    m = re.search('('+file_name_filter+'.*)\.xas$',file)
+  for f in files:
+    m = re.search('('+file_name_filter+'.*)\d\.txt$',f)
     if (m):
-      filename = file
+      filename = f
+      print filename
       name = filename
-      spectra[name] = Spectrum()
-      spectra[name].name = name
-      data = np.genfromtxt(filename,skip_header=5)
-      #print data
-      spectra[name].E = data[:,0]
-      spectra[name].data = data[:,1:]
-      
+      nametey = name+'TEY'
+      nametfy = name+'TFY'
+      spectra[nametey] = Spectrum()
+      spectra[nametey].name = nametey
+
+      spectra[nametfy] = Spectrum()
+      spectra[nametfy].name = nametfy
+
+      data = read_bl7011_xas(filename)
+
+      spectra[nametey].EE = data['MonoEnergy']
+      spectra[nametey].data = data['Counter1']/data['Izero']
+
+      spectra[nametfy].EE = data['MonoEnergy']
+      spectra[nametfy].data = data['Counter2']/data['Izero']
+
   return spectra
 
 def load_AugerScan_text_files(file_name_filter):
@@ -93,7 +104,7 @@ def load_AugerScan_text_files(file_name_filter):
   special_chars = r'[ \t\(\"\(\)\*\&\^\%\$\#\@\!\_\+\-\=\[\]\{\}\|\;\'\"\:\/\.\,\<\>\\\?]'
   
   spectra = {}
-  E=[]
+  EE=[]
   data=[]
   i = 0;
   for file in files:
@@ -119,7 +130,7 @@ def load_AugerScan_text_files(file_name_filter):
           spectrum.time_per_step = double(m.group(3))
           spectrum.sweeps = double(m.group(4))
           spectrum.name = name
-          spectrum.E=array([])
+          spectrum.EE=array([])
           spectrum.data=array([])
           spectra[label] = spectrum
         elif header:
@@ -127,7 +138,7 @@ def load_AugerScan_text_files(file_name_filter):
         elif (re.search('^[\d\.]+\s\d+\s*$',line)):
           m = re.search('^([\d\.]+)\s(\d+)',line)
           #print m.group(0)
-          spectra[label].E = append(spectra[label].E, double(m.group(1)))
+          spectra[label].EE = append(spectra[label].EE, double(m.group(1)))
           spectra[label].data = append(spectra[label].data, double(m.group(2)))
 
   return spectra

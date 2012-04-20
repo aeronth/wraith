@@ -81,6 +81,7 @@ class Background:
     self.penalties = penalties
     self.kernel = kernel
     self.kernel_end = kernel_end
+    self.optimization_history = ones((size(variables)+1,1))
 
   def set_spec(self, spec):
     self.penalties = []
@@ -90,6 +91,7 @@ class Background:
     self.variables = spec['variables']
     self.values = spec['values']
     self.kernel = eval(spec['function'])
+    self.optimization_history = c_[self.optimization_history,r_[self.values,sum(abs(self.spectrum.residuals()))]]
 
   def get_spec(self):
     ranges = []
@@ -119,6 +121,7 @@ class Background:
       i += 1
 
     res[res<0] = res[res<0]*20
+    self.optimization_history = c_[self.optimization_history,r_[values,sum(abs(res))]]
     return res
   
   def EE(self, dE):
@@ -147,7 +150,7 @@ class Peak:
     self.values = values
     self.penalties = penalties
     self.f = f
-    self.optimization_history = array([])
+    self.optimization_history = ones((size(variables)+1,1))
    
   def set_spec(self, spec):
     self.penalties = []
@@ -157,7 +160,7 @@ class Peak:
     self.variables = spec['variables']
     self.values = spec['values']
     self.f = eval(spec['function'])
-    self.optimization_history = c_[optimization_history,r_[self.values,sum(res)]]
+    self.optimization_history = c_[self.optimization_history,r_[self.values,sum(abs(self.spectrum.residuals()))]]
 
   def get_spec(self):
     ranges = []
@@ -225,7 +228,7 @@ class Peaks:
       i = 0
       p = param_eater[:peak.values.size]
       param_eater = param_eater[peak.values.size:]
-      peak.optimization_history = c_[optimization_history,r_[values,sum(res)]]
+      peak.optimization_history = c_[peak.optimization_history,r_[p,sum(abs(res))]]
       for value in p:
         pen = peak.penalties[i](value)
         res *= pen

@@ -46,7 +46,7 @@ class Spectrum:
 
   def set_spec(self, spec):
     self.clear_abg()
-    self.bg = Background()
+    self.bg = Background(self)
     self.peaks = Peaks(self)
     self.offset = spec['offset']
     self.bg.set_spec(spec['bg'])
@@ -62,11 +62,11 @@ class Spectrum:
 
   def crop(self, range):
     """Crop to fit within the energy window given in range"""
-    upper = self.E()>=range[0]
+    upper = self.EE>=range[0]+self.offset
     self.EE = self.EE[upper]
     self.data = self.data[upper]
 
-    lower = self.E()<=range[1]
+    lower = self.EE<=range[1]+self.offset
     self.EE = self.EE[lower]
     self.data = self.data[lower]
 
@@ -150,7 +150,7 @@ class Spectrum:
     for range in ranges:
       penalties.append(Penalty(range,penalty_function))
 
-    self.abg = AnalyticBackground(name, variables, values, penalties, function)
+    self.abg = AnalyticBackground(self, name, variables, values, penalties, function)
     self.abg.optimize_fit(self.E(), self.data)
  
   def guess_bg_from_spec(self, spec):
@@ -163,7 +163,7 @@ class Spectrum:
     for range in ranges:
       penalties.append(Penalty(range,penalty_function))
 
-    self.bg = Background(name, variables, values, penalties, function, values[1]*2)
+    self.bg = Background(self, name, variables, values, penalties, function, values[1]*2)
     self.bg.optimize_fit(self.E(), self.noabg())
   
   def guess_peak_from_spec(self, spec):
