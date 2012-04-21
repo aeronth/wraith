@@ -20,6 +20,7 @@ from spectra_fitting import *
 from VAMAS import *
 from pprint import *
 from mpl_toolkits.axisartist import Subplot
+from data_formats import *
 
 
 class ParameterSlider(QAbstractSlider):
@@ -290,7 +291,7 @@ class Form(QMainWindow):
     def load_file(self, filename=None):
         dialog = QFileDialog(self)
         dialog.setFileMode(QFileDialog.ExistingFiles)
-        dialog.setNameFilter('VAMAS (*.vms);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
+        dialog.setNameFilter('VAMAS (*.vms);; AugerScan (*.txt);; BL7.0.1.1 XAS (*.txt);; SSRL (*.dat);; SUPER (*);; All Files (*.*)')
         self.filefilter = 'VAMAS (*.vms)'
         dialog.filterSelected.connect(self.filterSelected)
 
@@ -345,7 +346,7 @@ class Form(QMainWindow):
     def on_show(self):
         if self.ignore_signals:
           return
-      
+
         self.axes.clear()        
         self.axes.set_autoscale_on(self.autoscale_cb.isChecked())
         self.axes.grid(True)
@@ -369,7 +370,7 @@ class Form(QMainWindow):
                 has_series = True
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
-                
+
                 if self.BG_cb.isChecked():
                   if self.NE_cb.isChecked():
                     m = max(spectrum.data)
@@ -431,7 +432,7 @@ class Form(QMainWindow):
                   
                   spectrum.plot_sg1(scale=scale,points=2*pnts + 1,axes=self.axes,offset=offset)
                   self.status_text.setText(spectrum.name)
-            
+
           if self.stacked_cb.isChecked():
             if self.normalize_cb.isChecked():
               if has_series:
@@ -538,6 +539,11 @@ class Form(QMainWindow):
       self.on_show()
 
     def plot_optimization_history(self, spectrum):
+      print "plot opt history"
+      if not hasattr(spectrum.bg, 'optimization_window'):
+        spectrum.bg.optimization_window = OptimizationWindow(spectrum.bg, parent=self)
+      spectrum.bg.optimization_window.update()
+
       for peak in spectrum.peaks:
         if not hasattr(peak, 'optimization_window'):
           peak.optimization_window = OptimizationWindow(peak, parent=self)
@@ -971,7 +977,7 @@ class DataHolder(object):
         if filename:
           if filefilter == 'VAMAS (*.vms)':
             experiment = VAMASExperiment(filename)
-            i = 1
+            i=1
             for block in experiment.blocks:
                 treename = 'Block-' + str(i) + '-' + block.sample_identifier + '-' + block.block_identifier
                 spectrum = Spectrum()
@@ -1026,29 +1032,7 @@ class DataHolder(object):
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
           elif filefilter == 'BL7.0.1.1 XAS (*.txt)':
-            experiment = np.genfromtxt(filename,
-                                       dtype='f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4,f4',
-                                       names=['TimeOfDay', 
-                                              'Time', 
-                                              'MonoEnergy', 
-                                              'BeamCurrent', 
-                                              'ShutterStatus', 
-                                              'Izero', 
-                                              'Counter0', 
-                                              'Counter1', 
-                                              'Counter2', 
-                                              'Counter3', 
-                                              'Counter4', 
-                                              'Counter5', 
-                                              'Counter6', 
-                                              'Gate7Out', 
-                                              'TempA', 
-                                              'TempB', 
-                                              'TempC', 
-                                              'TempD', 
-                                              'ColdCathodeGauge', 
-                                              'SREnergy'],
-                                       skip_header=14)
+            experiment = read_bl7011_xas(filename)
 
             spectrum = Spectrum()
             spectrum.EE = experiment['MonoEnergy']
@@ -1082,6 +1066,17 @@ class DataHolder(object):
             spectrum.EE = experiment['MonoEnergy']
             spectrum.data = experiment['Counter2']/experiment['Izero']
             spectrum.name = 'TFY/I0'
+            self.spectra.append(spectrum)
+            self.names.append(spectrum.name)
+
+          elif filefilter == 'AugerScan (*.txt)':
+            experiment = read_augerscan(filename)
+            spectrum = Spectrum()
+            spectrum.EE = experiment['Energy']
+            print spectrum.EE
+            spectrum.data = experiment['Counts']
+            print spectrum.data
+            spectrum.name = 'Region 1'
             self.spectra.append(spectrum)
             self.names.append(spectrum.name)
 
