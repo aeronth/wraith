@@ -19,7 +19,7 @@ from matplotlib.figure import Figure
 from spectra_fitting import *
 from VAMAS import *
 from pprint import *
-from mpl_toolkits.axisartist import Subplot
+import mpl_toolkits.axisartist as AA
 from data_formats import *
 
 
@@ -135,7 +135,7 @@ class ParameterDialog(QDialog):
           paramSlider.setMinimum(range[0])
           paramSlider.setMaximum(range[1])
           paramSlider.changed.connect(self.update)
-          paramSlider.changed.connect(fit_object.optimization_window.update)
+          #paramSlider.changed.connect(fit_object.optimization_window.update)
 
           parametersLayout.addWidget(paramSlider)
 
@@ -358,6 +358,17 @@ class Form(QMainWindow):
         ticks = array([])
         labels = []
 
+        pnts = int(self.smoothing_le.text())
+        if pnts<1:
+          pnts=1
+
+          self.ignore_signals = True
+          try:
+            self.smoothing_le.setText( str(pnts) )
+          except:
+            pass
+          self.ignore_signals = False
+ 
         for file in range(self.series_list_root.rowCount()):
           max_val = 0
           has_series = False; 
@@ -375,20 +386,6 @@ class Form(QMainWindow):
                   if self.NE_cb.isChecked():
                     m = max(spectrum.data)
                   else:
-                    pnts = int(self.smoothing_le.text())
-                    if pnts<2:
-                      pnts=2
-
-                    if pnts>12:
-                      pnts=12
-
-                    self.ignore_signals = True
-                    try:
-                      self.smoothing_le.setText( str(pnts) )
-                    except:
-                      pass
-                    self.ignore_signals = False
-                  
                     m = max(spectrum.sg1(points=2*pnts + 1))
                 else:
                   m = max(spectrum.nobg())
@@ -410,27 +407,14 @@ class Form(QMainWindow):
                   if self.BG_cb.isChecked():
                     if self.normalize_cb.isChecked():
                       scale = max_val
-                    spectrum.plot_full_summary(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
+                    spectrum.plot_full_summary(scale=scale, smoothpoints=pnts*2+1, axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
                   else:
                     if self.normalize_cb.isChecked():
                       scale = max_val
-                    spectrum.plot_full_summary_nobg(scale=scale,axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
+                    spectrum.plot_full_summary_nobg(scale=scale, smoothpoints=pnts*2+1, axes=self.axes, displayParams=self.param_cb.isChecked(),offset=offset)
                 if self.dNE_cb.isChecked():
-                  pnts = int(self.smoothing_le.text())
-                  if pnts<2:
-                    pnts=2
-
-                  if pnts>12:
-                    pnts=12
-
-                  self.ignore_signals = True
-                  try:
-                    self.smoothing_le.setText( str(pnts) )
-                  except:
-                    pass
-                  self.ignore_signals = False
-                  
-                  spectrum.plot_sg1(scale=scale,points=2*pnts + 1,axes=self.axes,offset=offset)
+                 
+                  spectrum.plot_sg1(scale=scale, points=pnts*2+1, axes=self.axes, offset=offset)
                   self.status_text.setText(spectrum.name)
 
           if self.stacked_cb.isChecked():
@@ -559,7 +543,7 @@ class Form(QMainWindow):
                 filename = self.series_list_root.child(file).text()
                 spectrum = self.files[filename].get_spectrum(row)
                 spectrum.peaks.optimize_fit(spectrum.E(), spectrum.nobg())
-                self.plot_optimization_history(spectrum)
+                #self.plot_optimization_history(spectrum)
         self.on_show()
       
     def write_summary_csv(self):
@@ -750,7 +734,7 @@ class Form(QMainWindow):
                       }
             event.artist.spectrum.guess_abg_from_spec(bg_spec)
 
-        self.plot_optimization_history(event.artist.spectrum)   
+        #self.plot_optimization_history(event.artist.spectrum)   
         self.on_show()
 
         return True
@@ -766,7 +750,7 @@ class Form(QMainWindow):
         #self.canvas.setParent(self.main_frame)
         self.cidpress = self.fig.canvas.mpl_connect('pick_event', self.on_pick)
 
-        self.axes = Subplot(self.fig,1,1,1)
+        self.axes = AA.Subplot(self.fig,1,1,1)
         self.fig.add_subplot(self.axes)
         self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
         
@@ -1072,7 +1056,7 @@ class DataHolder(object):
           elif filefilter == 'AugerScan (*.txt)':
             experiment = read_augerscan(filename)
             spectrum = Spectrum()
-            spectrum.EE = experiment['Energy']
+            spectrum.EE = -experiment['Energy']
             print spectrum.EE
             spectrum.data = experiment['Counts']
             print spectrum.data

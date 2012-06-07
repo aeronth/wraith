@@ -4,7 +4,8 @@ from pylab import *
 from scipy.optimize import leastsq
 from fitting_machinery import *
 from pprint import *
-
+from scipy import signal
+from functions import *
 
 class Spectrum:
   """A place to keep a spectrum"""
@@ -70,53 +71,39 @@ class Spectrum:
     self.EE = self.EE[lower]
     self.data = self.data[lower]
 
-  def sg(self,points):
-    ker = {}
-    ker[5] = r_[-3,12,17,12,-3]/35
-    ker[7] = r_[-2,3,6,7,6,3,-2]/21
-    ker[9] = r_[-21,14,39,54,59,54,39,14,-21]/231
-    ker[11] = r_[-36,9,44,69,84,89,84,69,44,9,-36]/429
-    ker[13] = r_[-11,0,9,16,21,24,25,24,21,16,9,0,-11]/143
-    ker[15] = r_[-78,-13,42,87,122,147,162,167,162,147,122,87,42,-13,-78]/1105
-    ker[17] = r_[-21,-6,7,18,27,34,39,42,43,42,39,34,27,18,7,-6,-21]/323
-    ker[19] = r_[-136,-51,24,89,144,189,224,249,264,269,264,249,224,189,144,89,24,-51,-136]/2261
-    ker[21] = r_[-171,-76,9,84,149,204,249,284,309,324,309,284,204,149,84,9,-76,-171]/3059
-    ker[23] = r_[-42,-21,-2,15,30,43,54,63,70,75,78,79,78,75,70,63,54,43,30,15,-2,-21,-42]/8059
-    ker[25] = r_[-253,-138,-33,62,147,222,287,322,387,422,447,462,467,462,447,422,387,322,287,222,147,62,-33,-138,-253]/5175
-
-    sg = -ker[points]
+  def _sg(self,A,points):
+    order = 4
+    if points<5:
+      order = 2
+    kernel = savgol(points,points/2,points/2,0,order)#-ker[points]
     pad_start = array([])
     pad_end = array([])
-    for i in range(0,points/2):
-      pad_start = r_[self.data[0], pad_start]
-      pad_end = r_[pad_end, self.data[-1]]
-    sg1 = r_[pad_start, self.data, pad_end]
-    sg1 = convolve(sg1, sg, 'valid')
+    for i in range(0,(points/2)):
+      pad_start = r_[A[0], pad_start]
+      pad_end = r_[pad_end, A[-1]]
+    sg = r_[pad_start, A, pad_end]
+    sg = signal.fftconvolve(sg, kernel, 'valid')
+    return sg
+
+  def sg(self,points):
+    return self._sg(self.data,points)
+
+  def _sg1(self,dE,A,points):
+    order = 4
+    if points<5:
+      order = 2
+    kernel = savgol(points, points/2, points/2,1,order)/dE
+    pad_start = array([])
+    pad_end = array([])
+    for i in range(0,(points/2)):
+      pad_start = r_[A[0], pad_start]
+      pad_end = r_[pad_end, A[-1]]
+    sg1 = r_[pad_start, A, pad_end]
+    sg1 = convolve(sg1, kernel, 'valid')
     return sg1
 
   def sg1(self,points):
-    ker = {}
-    ker[5] = r_[-2:2.1]/10
-    ker[7] = r_[-3:3.1]/28
-    ker[9] = r_[-4:4.1]/60
-    ker[11] = r_[-5:5.1]/110
-    ker[13] = r_[-6:6.1]/182
-    ker[15] = r_[-7:7.1]/280
-    ker[17] = r_[-8:8.1]/408
-    ker[19] = r_[-9:9.1]/570
-    ker[21] = r_[-10:10.1]/770
-    ker[23] = r_[-11:11.1]/1012
-    ker[25] = r_[-12:12.1]/1300
-
-    sg = ker[points]/(self.E()[0]-self.E()[1])
-    pad_start = array([])
-    pad_end = array([])
-    for i in range(0,points/2):
-      pad_start = r_[self.data[0], pad_start]
-      pad_end = r_[pad_end, self.data[-1]]
-    sg1 = r_[pad_start, self.data, pad_end]
-    sg1 = convolve(sg1, sg, 'valid')
-    return sg1
+    return self._sg1(self.E()[0]-self.E()[1], self.data, points)
 
   def noabg(self):
     """return spectrum with bg subtracted"""
@@ -188,8 +175,15 @@ class Spectrum:
     """Plot the spectra"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), offset+(self.data)/scale,':o', markersize=3, label=self.name,picker=2)
+    lines = axes.plot(self.E(), offset+(self.data)/scale, markersize=3, label=self.name,picker=2)
+    for line in lines:
+      line.spectrum = self
 
+  def plot_sg(self,points=5, scale=1.0,axes=None, offset=0.0):
+    """Plot the smoothed spectra"""
+    if axes==None:
+      axes = gca()
+    lines = axes.plot(self.E(), offset+(self.sg(points))/scale, markersize=3, label=self.name,picker=2)
     for line in lines:
       line.spectrum = self
 
@@ -197,13 +191,21 @@ class Spectrum:
     """Plot the Savitski Golay derviative of the spectra"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), offset+(self.sg1(points))/scale,':o', markersize=3, label=self.name+'-sg1(%d)'%(points,))
+    lines = axes.plot(self.E(), offset+(self.sg1(points))/scale, markersize=3, label=self.name+'-sg1(%d)'%(points,))
 
   def plot_nobg(self,scale=1.0, axes=None, offset=0.0):
-    """Plot sepctrum with bg subtracted"""
+    """Plot spectrum with bg subtracted"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), offset+(self.nobg())/scale,':o', markersize=3, label=self.name+'-nobg',picker=2)
+    lines = axes.plot(self.E(), offset+(self.nobg())/scale, markersize=3, label=self.name+'-nobg',picker=2)
+    for line in lines:
+      line.spectrum = self
+
+  def plot_sg_nobg(self,points=5, scale=1.0,axes=None, offset=0.0):
+    """Plot the smoothed spectra"""
+    if axes==None:
+      axes = gca()
+    lines = axes.plot(self.E(), offset+(self._sg(self.nobg(),points))/scale, markersize=3, label=self.name,picker=2)
     for line in lines:
       line.spectrum = self
 
@@ -211,7 +213,7 @@ class Spectrum:
     """Plot the peaks summed together"""
     if axes==None:
       axes = gca()
-    lines = axes.plot(self.E(), offset + (self.peaks(self.E()))/scale,label=self.name+'-peaks')
+    lines = axes.plot(self.E(), offset + (self.peaks(self.E()))/scale, ':', label=self.name+'-peaks')
     for line in lines:
       line.spectrum = self
 
@@ -281,11 +283,14 @@ class Spectrum:
     for line in lines:
       line.spectrum = self
 
-  def plot_full_summary(self,scale=1.0, axes=None, displayParams=True, offset=0.0):
+  def plot_full_summary(self,smoothpoints=1,scale=1.0, axes=None, displayParams=True, offset=0.0):
     """Plot the spectrum, the bg, and the full fit"""
     if axes==None:
       axes = gca()
-    self.plot(scale, axes, offset)
+    #if smoothpoints<5:
+    #  self.plot(scale, axes, offset)
+    #else:
+    self.plot_sg(smoothpoints, scale, axes, offset)
     self.plot_bg(scale, axes, offset)
     self.plot_abg(scale, axes, offset)
     self.plot_kbg(scale, axes, offset)
@@ -344,11 +349,14 @@ class Spectrum:
         #an.draggable()
         an.fit_object = peak
   
-  def plot_full_summary_nobg(self,scale=1.0, axes=None, displayParams=True, offset=0.0):
+  def plot_full_summary_nobg(self,smoothpoints=1,scale=1.0, axes=None, displayParams=True, offset=0.0):
     """Plot the spectrum, the bg, and the full fit"""
     if axes==None:
       axes = gca()
-    self.plot_nobg(scale, axes, offset)
+    if smoothpoints<5:
+      self.plot_nobg(scale, axes, offset)
+    else:
+      self.plot_sg_nobg(smoothpoints, scale, axes, offset)
     self.plot_peaks(scale, axes, offset)
     self.plot_individual_peaks(scale, axes, offset)
 
