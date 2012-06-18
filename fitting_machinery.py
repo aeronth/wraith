@@ -73,7 +73,7 @@ class AnalyticBackground:
 class Background:
   """Implements a generic background based on a convolution kernel function"""
 
-  def __init__(self, spectrum, name='tougaard', variables=['B','D'], values=r_[100,100], penalties=[Penalty(r_[0,100],no_penalty)], kernel=K, kernel_end=200):
+  def __init__(self, spectrum, name='tougaard', variables=['B','D'], values=r_[100,100], penalties=[Penalty(r_[0,100],no_penalty), Penalty(r_[0,100],no_penalty)], kernel=K, kernel_end=200):
     self.spectrum = spectrum
     self.name = name
     self.values = values
