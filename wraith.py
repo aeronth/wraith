@@ -1,270 +1,45 @@
-#! /usr/bin/python
+#!/usr/bin/env ipython
 
+#import base
 import sys, os, csv, string
-#from PySide.QtCore import *
+from pprint import *
+
+#import Qt 
 from PySide.QtCore import Signal
 from PySide.QtCore import Slot
 from PySide.QtCore import *
 from PySide.QtGui import *
 from PySide import QtCore, QtGui
 
+#import iPython kernel
+
+#import matplotlib and configure
 import matplotlib
 matplotlib.use('Qt4Agg')
 matplotlib.rcParams['backend.qt4']= "PySide"
+import mpl_toolkits.axisartist as AA
 
-from pylab import *
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
+
+#import pylab, which includes scipy and numpy
+from pylab import *
+
+#### import project specific items ####
+
+#spectra fitting toolkit
 from spectra_fitting import *
+
+#module to handle VAMAS file format
 from VAMAS import *
-from pprint import *
-import mpl_toolkits.axisartist as AA
+
+#module for other data formats
 from data_formats import *
 
-
-class ParameterSlider(QAbstractSlider):
-
-  changed = Signal()
-
-  def __init__(self, var, parent=None):
-    super(ParameterSlider,self).__init__(parent)
-    self.parent = parent
-
-    self.ignore_signals = False
-    
-    self.varLabel = QLabel(var)
-
-    self.value = QLineEdit()
-    self.value.textChanged.connect(self.updateSlider)
-    self.value.textChanged.connect(self.changed)
-
-    self.slider = QSlider(Qt.Horizontal)
-    self.slider.setMinimum(0)
-    self.slider.setMaximum(1000)
-    self.slider.setSingleStep(1)
-    self.slider.valueChanged[int].connect(self.sliderChanged)
-
-    inLabel = QLabel('\in (')
-    commaLabel = QLabel(',')
-    endLabel = QLabel(')')
-
-    self.lower = QLineEdit('0.0')
-    self.lower.textChanged.connect(self.updateSlider)
-    self.lower.textChanged.connect(self.changed)
-    self.upper = QLineEdit('1.0')
-    self.upper.textChanged.connect(self.updateSlider)
-    self.upper.textChanged.connect(self.changed)
-
-    self.maxValue = 1000.0
-    self.minValue = 0.0
-  
-    upperBox = QHBoxLayout()
-    mainLayout = QVBoxLayout()
-    upperBox.addWidget(self.varLabel)
-    upperBox.addWidget(self.value)
-    upperBox.addWidget(inLabel)
-    upperBox.addWidget(self.lower)
-    upperBox.addWidget(commaLabel)
-    upperBox.addWidget(self.upper)
-    upperBox.addWidget(endLabel)
-
-    mainLayout.addLayout(upperBox)
-    mainLayout.addWidget(self.slider)
-    self.setLayout(mainLayout)
-
-  def sliderChanged(self, value):
-    if self.ignore_signals:
-      return
-  
-    self.ignore_signals = True
-    try:
-      self.value.setText(str(self.minValue + value * (self.maxValue-self.minValue)/1000) )
-    except:
-      pass
-    self.ignore_signals = False
-
-  def updateSlider(self):
-    if self.ignore_signals:
-      return
-
-    self.ignore_signals = True
-    try:
-      self.minValue = float(self.lower.text())
-      self.maxValue = float(self.upper.text())
-      self.slider.setValue( int( (float(self.value.text())-self.minValue) * 1000/(self.maxValue-self.minValue)))
-    except:
-      pass
-    self.ignore_signals = False
-
-  def setMinimum(self, value):
-    self.minValue = value
-    self.lower.setText(str(value))
-
-  def setMaximum(self, value):
-    self.maxValue = value
-    self.upper.setText(str(value))
-
-  def getValue(self):
-    return float(self.value.text())
-
-  def setValue(self, value):
-    self.value.setText(str(value))
-
-  def getRange(self):
-    return r_[float(self.lower.text()), float(self.upper.text())]
-  
-class ParameterDialog(QDialog):
-    def __init__(self, fit_object, parent=None):
-      super(ParameterDialog,self).__init__(parent)
-
-      self.parent = parent
-    
-      self.fit_object = fit_object
-
-      spec = fit_object.get_spec()
-      self.parametersGroup = QGroupBox("Edit Parameters")
-    
-      self.paramSliders = []
-
-      parametersLayout = QVBoxLayout()
-      for var, val, range in zip(spec['variables'], spec['values'], spec['ranges']):
-          paramSlider = ParameterSlider(var)
-          self.paramSliders.append(paramSlider)
-          paramSlider.setValue(val)
-          paramSlider.setMinimum(range[0])
-          paramSlider.setMaximum(range[1])
-          paramSlider.changed.connect(self.update)
-          #paramSlider.changed.connect(fit_object.optimization_window.update)
-
-          parametersLayout.addWidget(paramSlider)
-
-      self.parametersGroup.setLayout(parametersLayout)
-      mainLayout = QVBoxLayout()
-      mainLayout.addWidget(self.parametersGroup)
-      self.setLayout(mainLayout)
-      self.setWindowTitle(fit_object.name)
-
-    def update(self):
-      spec = self.fit_object.get_spec()
-      values = []
-      ranges = []
-
-      for paramSlider in self.paramSliders:
-        values.append(paramSlider.getValue())
-        ranges.append(paramSlider.getRange())
-
-      values = array(values)
-
-      spec['values']=values
-      spec['ranges']=ranges
-
-      self.fit_object.set_spec(spec)
-      self.parent.on_show()
-
-class OptimizationWindow(QMainWindow):
-  def __init__(self, fit_object, parent=None):
-    super(OptimizationWindow,self).__init__(parent)
-
-    self.parent = parent
-
-    self.fit_object = fit_object
-
-    spec = fit_object.get_spec()
-
-    self.main_frame = QWidget()
-
-    mainLayout = QVBoxLayout()
-    self.setWindowTitle('Optimization - ' + fit_object.name)
-
-    self.dpi = 100
-    self.fig = Figure((6.0, 4.0), dpi=self.dpi, facecolor='w', edgecolor='k')
-    self.canvas = FigureCanvas(self.fig)
-    self.canvas.setParent(self.main_frame)
-
-    N = size(spec['variables'])+1
-    i = 1
-    self.axes = {}
-    for var, val, range in zip(spec['variables'], spec['values'], spec['ranges']):
-        self.axes[var] = Subplot(self.fig,ceil(N/2.0),2,i)
-        i += 1
-        self.fig.add_subplot(self.axes[var])
-        self.axes[var].set_ylabel("$"+var+"$")
-        self.axes[var].set_ylim(range)
-    
-    self.opt_axes = Subplot(self.fig,ceil(N/2.0),2,N)
-    self.fig.add_subplot(self.opt_axes)
-
-    self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
-    
-    mainLayout.addWidget(self.canvas)
-    mainLayout.addWidget(self.mpl_toolbar)
-
-    self.main_frame.setLayout(mainLayout)
-
-    self.setCentralWidget(self.main_frame)
-    self.show()
-    self.max_r = max(self.fit_object.spectrum.data)*1e2
-
-  def update(self):
-    spec = self.fit_object.get_spec()
-    i=0
-    window_size = 2500
-    l = len(self.fit_object.optimization_history[i,:])
-    for var, val, range in zip(spec['variables'], spec['values'], spec['ranges']):
-        self.axes[var].cla()
-        self.axes[var].plot(self.fit_object.optimization_history[i,:])
-        i+=1
-        self.axes[var].set_ylim(range)
-        self.axes[var].set_ylabel("$"+var+"$")
-        self.axes[var].set_xlim([l-window_size,l])
-
-    points = self.fit_object.optimization_history[i,:]
-    points[points>self.max_r] = self.max_r
-    #points[points<0] = 0
-    self.opt_axes.cla()
-    self.opt_axes.plot(points)
-    self.opt_axes.set_ylabel("$\sum R^2$")
-    self.opt_axes.set_xlim([l-window_size,l])
-    self.opt_axes.set_ylim(mean(points[-window_size:])+r_[-6,6]*std(points[-window_size:]))
-
-    self.canvas.draw()
-    self.show()
-
-
-class AverageWindow(QMainWindow):
-    def __init__(self, spectrum, parent=None):
-      super(AverageWindow,self).__init__(parent)
-  
-      self.parent = parent
-    
-      self.spectrum = spectrum
-  
-      self.main_frame = QWidget()
-  
-      mainLayout = QVBoxLayout()
-      self.setWindowTitle('Average')
-
-      self.dpi = 100
-      self.fig = Figure((6.0, 4.0), dpi=self.dpi, facecolor='w', edgecolor='k')
-      self.canvas = FigureCanvas(self.fig)
-      self.canvas.setParent(self.main_frame)
-
-      self.axes = Subplot(self.fig,1,1,1)
-      self.fig.add_subplot(self.axes)
-      self.mpl_toolbar = NavigationToolbar(self.canvas, self.main_frame)
-      
-      mainLayout.addWidget(self.canvas)
-      mainLayout.addWidget(self.mpl_toolbar)
-
-      self.main_frame.setLayout(mainLayout)
-
-      self.setCentralWidget(self.main_frame)
-
-      spectrum.plot_full_summary(scale=1,axes=self.axes)
-
-    def update(self):
-      pass
+#custom gui elements to adjust and display fitting parameters
+from parameter_gui import *
+from optimization_gui import *
 
 class Form(QMainWindow):
     def __init__(self, parent=None):
@@ -570,39 +345,6 @@ class Form(QMainWindow):
     def plot_summary_csv(self):
       pass
 
-    def average(self):
-      i = 0
-      outputname = ''
-      for file in range(self.series_list_root.rowCount()):
-        for row in range(self.series_list_root.child(file).rowCount()):
-          model_index = self.series_list_root.child(file).child(row).index()
-          checked = self.series_list_model.data(model_index, Qt.CheckStateRole) == (Qt.Checked)
-          if checked:
-            filename = self.series_list_root.child(file).text()
-            spectrum = self.files[filename].get_spectrum(row)
-            outputname += str(filename+spectrum.name)
-            if i==0:
-              summer = copy(spectrum.data)
-              E = spectrum.E()
-            else:
-              summer += spectrum.data
-
-            i += 1
-
-      ave = summer/i
-      spectrum = Spectrum()
-
-      spectrum.EE = E
-      spectrum.data = ave
-      spectrum.name = 'Average'
-
-      self.averageWindow = AverageWindow(spectrum, parent=self)
-      self.averageWindow.show()
-      out = c_[spectrum.EE,spectrum.data]
-      np.savetxt(string.replace(outputname,'/','')+'.csv', out, fmt="%12.6G")
-      #figure()
- 
-
     def on_about(self):
         msg = __doc__
         QMessageBox.about(self, "About the demo", msg.strip())
@@ -864,11 +606,6 @@ class Form(QMainWindow):
         self.button_write_summary.clicked.connect(self.write_summary_csv)
         self.button_write_summary.setShortcut("Ctrl+E")
 
-        self.button_average = QPushButton("&Average")
-        self.button_average.clicked.connect(self.average)
-        self.button_average.setShortcut("Ctrl+A")
-
-
         #action buttons layout
         mods_box = QGridLayout()
         mods_box.addWidget(self.button_optimize_peaks,0,0)
@@ -878,7 +615,6 @@ class Form(QMainWindow):
         mods_box.addWidget(self.button_write_fits,1,1)
         mods_box.addWidget(self.button_load_fits,1,2)
         mods_box.addWidget(self.button_write_summary,3,1)
-        mods_box.addWidget(self.button_average,3,2)
 
         left_vbox = QVBoxLayout()
         left_vbox.addWidget(self.canvas)
@@ -1080,7 +816,7 @@ class DataHolder(object):
     def get_spectrum(self, index):
         return self.spectra[index]
 
-
+#main function to start up program
 def main():
     matplotlib.rcParams['mathtext.fontset'] = 'stixsans'
     app = QApplication(sys.argv)
@@ -1090,16 +826,17 @@ def main():
     form.show()
     app.exec_()
 
+#wraith function to start up program from interactive terminal
+def wraith():
+    matplotlib.rcParams['mathtext.fontset'] = 'stixsans'
+    app = QtCore.QCoreApplication.instance()
+    form = Form()
+    QApplication.setStyle(QStyleFactory.create('Plastique'))
+    QApplication.setPalette(QApplication.style().standardPalette())
+    form.show()
+    app.exec_()
 
+
+#if run from commandline then start up by calling main()
 if __name__ == "__main__":
     main()
-    print "Fired up"
-
- #   app = QApplication(sys.argv)
- #   form = Form()
- #   form.show()
- #   QApplication.setStyle(QStyleFactory.create('Plastique'))
- #   QApplication.setPalette(QApplication.style().standardPalette())
-    
-    
-     
