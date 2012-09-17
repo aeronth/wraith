@@ -232,8 +232,11 @@ class VAMASExperiment:
 
             # 6
             seconds = int(lines.next().strip())
-            block.date = datetime(year,month,day,hours,minutes,seconds)
-
+            try:
+              block.date = datetime(year,month,day,hours,minutes,seconds)
+            except:
+              print "odd date: %dy, %dm, %dd, %dh, %dm, %ds"%(year,month,day,hours,minutes,seconds)
+              block.date = datetime(1970,1,1,1,1,1)
             # 7
             block.number_of_hours_in_advance_of_greenwich_mean_time = int(lines.next().strip())
 
