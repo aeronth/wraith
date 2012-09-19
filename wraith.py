@@ -7,16 +7,14 @@ from pprint import *
 #import Qt 
 from PySide.QtCore import Signal
 from PySide.QtCore import Slot
-from PySide.QtCore import *
-from PySide.QtGui import *
+#from PySide.QtCore import *
+#from PySide.QtGui import *
 from PySide import QtCore, QtGui
 
 #import iPython kernel
 
 #import matplotlib and configure
 import matplotlib
-matplotlib.use('Qt4Agg')
-matplotlib.rcParams['backend.qt4']= "PySide"
 import mpl_toolkits.axisartist as AA
 
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
@@ -41,6 +39,7 @@ from data_formats import *
 from parameter_gui import *
 from optimization_gui import *
 
+#Main window to control plotting
 class Form(QMainWindow):
     def __init__(self, parent=None):
         super(Form, self).__init__(parent)
@@ -830,13 +829,15 @@ def main():
 def wraith():
     matplotlib.rcParams['mathtext.fontset'] = 'stixsans'
     app = QtCore.QCoreApplication.instance()
-    form = Form()
+    app.form = Form()
     QApplication.setStyle(QStyleFactory.create('Plastique'))
     QApplication.setPalette(QApplication.style().standardPalette())
-    form.show()
-    app.exec_()
+    app.form.show()
+    #app.exec_()
 
 
 #if run from commandline then start up by calling main()
 if __name__ == "__main__":
     main()
+else:
+    app = QtCore.QCoreApplication.instance()
