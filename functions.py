@@ -1,6 +1,21 @@
 from pylab import *
 import scipy.linalg
 from scipy.misc import factorial
+from scipy import signal
+
+def savgol_smooth(A, points, degree):
+  order = 4
+  if points<5:
+    order = 2
+  kernel = savgol(points,points/2,points/2,degree,order)#-ker[points]
+  pad_start = array([])
+  pad_end = array([])
+  for i in range(0,(points/2)-1):
+    pad_start = r_[A[0], pad_start]
+    pad_end = r_[pad_end, A[-1]]
+  sg = r_[pad_start, A, pad_end]
+  sg = signal.fftconvolve(sg, kernel, 'valid')
+  return sg
 
 def savgol(np, nl, nr, ld, m):
   a = zeros([m+1, m+1])
