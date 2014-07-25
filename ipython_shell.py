@@ -1,7 +1,7 @@
 '''
 Created on 18-03-2012
 
-@author: Paweł Jarosz
+@author: Pawel Jarosz
 '''
 import os, sys
 import atexit

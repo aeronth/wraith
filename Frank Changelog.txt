@@ -1,0 +1,98 @@
+Frank Changelog June 2014
+
+modifed tree names to have vamas comments, no placeholders
+
+add line color to Spectrum class, color assigned on first line draw
+
+add preprocessing checkbox, corrects dead time count ranges for Omicron 7 channel data
+    also corrects FRR FAT (CRR CAR) data to Hz/eV resolution
+    background works pretty well for corrected CRR, CRR and CAE scale, small loss of counts
+    with retardation
+
+add spin box for smoothing instead of text
+
+change DataHolder class to SpectraFile class
+
+change Pyside to PyQt for anaconda
+    this required replacing PySide.QtCore with PyQt4.Qt4, etc
+    also Signal() class in PySide not in PyQt4, pyqtSignal() works
+	...and change it back to PySide for compatibility with Ed Bs efforts
+	     
+July
+	get running with Anaconda (Win7 OS X both)
+	use with Eclipse/Pydev
+	
+	several style changes to satisfy IDE (sorry Aaron)
+		4 space indent
+		restrict some imports
+		replace some reserved variable names like 'file'
+		
+	for background fitting change data offset from min(spectrum) to spectrum[-1]
+		this respects physical model, min can go low at low kinetic energy due to 
+		spectrometer transmission function
+		
+	change Tougaard abstract background to physical background E_loss, R_loss
+		E_loss is mean loss in eV, ~ 10 - 80, Tougaard best 63.6
+		R_loss is ratio zero loss to single loss, ~ 0.8 to 1.0 Tougaard 0.872
+		B*T/(C+T**2)**2
+		C -> 4*dE_ave/pi**2 
+		B -> 8*R_loss*dE_ave
+		
+	update Edit Parameters dialog to use QDoubleSpinBoxes for limits and value
+		some issues with recursive updates during build. Per Nick's suggestion first dynamically
+		build dialog THEN attach signals.
+		
+	found out why no tool tips are displayed on sub-menus, "feature" of Qt 4, tool tips for widgets
+		but menu actions not widgits....status line tips DO work.
+		
+	add Clear files action to menus, to close (remove plots, remove from tree) a file without 
+		quitting/restarting Wraith. Item added but causes problems with model/view, maybe
+		saved reference to list invisible root???
+		
+		maybe better to have a way to remove a single file
+		
+	to better support eclipse, reorganize wraith.py since debugger cannot reload main()
+		wraith is now minimal module to create Gui message loop, etc
+		move SpectraFile to spectrum_handling, (later may put Spectrum here...)
+		move Form() to wraith_main_window, (later may split up, mixes GUI and fitting stuff)
+
++++++++++++++++++++++++
+Data Tree Model
++++++++++++++++++++++++
+	Form keeps dict { base_name, SpectraFile }
+		Spectrum objects loaded from SpectraFile's
+			each SF has two lists of treenames and Spectrum objects
+				should these be dict? or list of tuples? or in QModel?
+				
+				
+	More powerful use of AbstractItemModel
+		root/files/spectra/fits-peaks
+		subclass model, store file names and spectra inside\
+		item data roles include DisplayRole (text) DecorationRole (plot color)
+		could add backgrounds, fits as children of spectra
+		
+		display same model as table, with plot energy, signal offsets, scales, colors, etc
+		
+		save/restore model
+		
+		drag/drop to create new files..., new models...
+			open file adds rows, delet row closes files, 
+		
+		
+		
++++++++++++++++++++++++
+To Fix
++++++++++++++++++++++++
+
+	still need spec name on Edit Parameters dialog window, so not all identical...
+	
+	when file is opened, menu is rebuilt, existing plots/check boxes get out of synch. 
+		need to be more subtle in adding/removing files, also way to update files during acquisition,
+		so if file loaded with 15 spectra then reloaded with 17, plots/checks not changed....
+		
+	Parameter dialogs stay in scope when fits cleared...they also need per-item labels
+	
+	Can add context QMenu to tree list items, add QActions to menu
+		could include clear peaks, bg, delete file, change color, change text... 
+		
+		

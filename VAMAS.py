@@ -1,3 +1,4 @@
+
 #######################################################################################################
 # Copyright (c) 2010
 #
@@ -85,7 +86,7 @@ class VAMASExperiment:
         # the value of scan mode is 'REGULAR', otherwise the value of scan mode is 'IRREGULAR'.
 
         # only present if experiement_mode is 'MAP', 'MAPDP', 'NORM', or 'SDP'
-        self.number_of_spectral_regions = 0  
+        self.number_of_spectral_regions = 0
 
         # only present if experiement_mode is 'MAP', or 'MAPDP'
         self.number_of_analysis_positions = 0
@@ -106,7 +107,7 @@ class VAMASExperiment:
         # blocks. If number_of_entries_in_parameter_inclusion_or_exclusion_list is positive
         # then the parameters listed are to be included; if it is negative then the
         # parameters listed are to be excluded; if it is zero then all parameters are to
-        # be given in all blocks. 
+        # be given in all blocks.
         self.number_of_entries_in_parameter_inclusion_or_exclusion_list = 0
 
         # The number of occurrences of parameter_inclusion_or_exclusion_prefix_numbers is given by the
@@ -148,7 +149,7 @@ class VAMASExperiment:
 
         self.experiment_terminator = 'end of experiment'
     #end def __init__(self):
-    
+
     def __init__(self,filename):
         self.set_defaults()
         self.file = open(filename)
@@ -215,7 +216,7 @@ class VAMASExperiment:
             block.sample_identifier = lines.next().strip()
             # 1
             year = int(lines.next().strip())
-            
+
             # 2
             month = int(lines.next().strip())
 
@@ -226,17 +227,17 @@ class VAMASExperiment:
             hours = int(lines.next().strip())
             if hours == 24:
                 hours = 0 #catch a 24:00 hours ambiguity
-                
+
             # 5
             minutes = int(lines.next().strip())
 
             # 6
             seconds = int(lines.next().strip())
             try:
-              block.date = datetime(year,month,day,hours,minutes,seconds)
+                block.date = datetime(year,month,day,hours,minutes,seconds)
             except:
-              print "odd date: %dy, %dm, %dd, %dh, %dm, %ds"%(year,month,day,hours,minutes,seconds)
-              block.date = datetime(1970,1,1,1,1,1)
+                print "odd date: %dy, %dm, %dd, %dh, %dm, %ds"%(year,month,day,hours,minutes,seconds)
+                block.date = datetime(1970,1,1,1,1,1)
             # 7
             block.number_of_hours_in_advance_of_greenwich_mean_time = int(lines.next().strip())
 
@@ -335,7 +336,7 @@ class VAMASExperiment:
             # 27
             block.analysis_width_x = float(lines.next().strip())
             block.analysis_width_y = float(lines.next().strip())
-            
+
             # 28
             block.analyser_axis_take_off_polar_angle = float(lines.next().strip())
             block.analyser_axis_take_off_azimuth = float(lines.next().strip())
@@ -490,7 +491,7 @@ class VAMASExperiment:
             block.sample_identifier = lines.next().strip()
             # 1
             year = int(lines.next().strip())
-            
+
             # 2
             month = int(lines.next().strip())
 
@@ -605,7 +606,7 @@ class VAMASExperiment:
             # 27
             block.analysis_width_x = float(lines.next().strip())
             block.analysis_width_y = float(lines.next().strip())
-            
+
             # 28
             block.analyser_axis_take_off_polar_angle = float(lines.next().strip())
             block.analyser_axis_take_off_azimuth = float(lines.next().strip())
@@ -698,7 +699,7 @@ class VAMASExperiment:
 
         #end for i in range(self.number_of_blocks):
     #end write_to_file
-#end Class VAMASExperiment            
+#end Class VAMASExperiment
 
 #Class to store the data contained within one block of an experiment
 class VAMASBlock:
@@ -717,7 +718,7 @@ class VAMASBlock:
 
     def ordinate(self,variable_number):
         return array(self.ordinate_values[variable_number])
-            
+
     def set_defaults(self):
         self.block_identifier = "Not Specified"
         self.sample_identifier = "Not Specified"
@@ -810,7 +811,7 @@ class VAMASBlock:
         self.magnification_of_analyser_transfer_lens = 1
 
         # positive value for work function in electron volts for AES,ELS, ISS, UPS and XPS.
-        # The acceptance energy of an ion is the energy filter pass energy of the mass spectrometer for FABMS, SIMS, and SNMS. 
+        # The acceptance energy of an ion is the energy filter pass energy of the mass spectrometer for FABMS, SIMS, and SNMS.
         self.analyser_work_function_or_acceptance_energy_of_atom_or_ion = 0
 
         # target bias is in volts, including the sign
@@ -850,7 +851,7 @@ class VAMASBlock:
         # number_of_corresponding_variables is equal to the number of variables, otherwise it is equal to unity.
         self.number_of_corresponding_variables = 1
 
-        # The number of occurrences of the below pair of items is specified by the value of 
+        # The number of occurrences of the below pair of items is specified by the value of
         # number_of_corresponding_variables above.
         self.corresponding_variable_labels = []
         self.corresponding_variable_units = []
@@ -863,7 +864,7 @@ class VAMASBlock:
 
 
         # time in seconds per scan for each channel or array-point, except for both EDX and XRF
-        # where it is the total spectrum collection time 
+        # where it is the total spectrum collection time
         self.signal_collection_time = 0
 
         self.number_of_scans_to_compile_this_block = 1

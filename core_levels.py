@@ -1,4 +1,4 @@
-core_levels = { 
+core_levels = {
     'H': {
           'K - 1s': 13.6},
     'He': {

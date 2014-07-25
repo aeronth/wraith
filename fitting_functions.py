@@ -1,7 +1,7 @@
 from pylab import *
 
 ###########################################
-# Functions to feed into fitting routines 
+# Functions to feed into fitting routines
 ###########################################
 
 def analyzer_function(p, E):
@@ -17,19 +17,22 @@ def slope(p, E):
 
 def fitting_arctan(p, E):
     A, B, u, b = p
-    BG = b + A * arctan( B * (E - u) ) 
+    BG = b + A * arctan( B * (E - u) )
     return BG
 
 def sloped_arctan(p, E):
     A, B, u, m, b = p
-    BG = b + m * E + A * arctan( B * (E - u) ) 
+    BG = b + m * E + A * arctan( B * (E - u) )
     return BG
 sloped_arctan.latex = r'$s_arctan(E) = b + mE + A {\rm arctan} ( B (E - u) )$'
 
 def K(p, E):
+    """Physical convolution kernel for Tougaard background"""
+    R_loss, E_loss = p
+    K_ = (8.0/pi**2)*R_loss*E_loss**2 * E / ((2.0*E_loss/pi)**2 + E**2)**2
     """convolution kernel for Tougaard background"""
-    B, C = p
-    K_ = B * E / (C + E**2)**2
+    #B, C = p
+    #K_ = B * E / (C + E**2)**2
     K_ = K_*(K_>0)
     return K_
 
@@ -79,7 +82,7 @@ def gl50(params, E):
     return gl_(a, mu, sigma, m, E)
 
 def gls_(a, mu, sigma, m, E):
-    return a * (1 - m) * exp(-2.772589 * (E - mu)**2/sigma**2) + m/(1 + 4 * (E - mu)**2/sigma**2) 
+    return a * (1 - m) * exp(-2.772589 * (E - mu)**2/sigma**2) + m/(1 + 4 * (E - mu)**2/sigma**2)
 
 def gls(params, E):
     a, mu, sigma, m = params
@@ -123,9 +126,9 @@ def exp_penalty(range, p):
     A = 1.0/diff(range)
     value = 1.0
     if p < range[0]:
-      value = 1.0 + exp(A*((range[0]+0.05*diff(range)) - p ))
+        value = 1.0 + exp(A*((range[0]+0.05*diff(range)) - p ))
     elif p > range[1]:
-      value = 1.0 + exp(A*(p - (range[1]-0.05*diff(range)) ))
+        value = 1.0 + exp(A*(p - (range[1]-0.05*diff(range)) ))
     return value
 
 #Residuals are scaled by a quadratically growing factor if parameter value is outside of the range
@@ -139,4 +142,3 @@ def quad_penalty(range, p):
     elif p > upper_bound:
         value = 1.0 + A*(p - upper_bound )**2
     return value
-    
